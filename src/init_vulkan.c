@@ -64,7 +64,6 @@ VkResult create_device(VkDevice* pDevice, VkPhysicalDevice physical_device, uint
     dev_create_info.enabledExtensionCount = nr_extensions;
     dev_create_info.ppEnabledExtensionNames = extensions; 
 
-    VkDevice gpu;
     VkResult result = vkCreateDevice(physical_device, &dev_create_info, NULL, pDevice);
     
 
@@ -74,7 +73,7 @@ VkResult create_device(VkDevice* pDevice, VkPhysicalDevice physical_device, uint
 VkResult init_vulkan(
         uint32_t nr_inst_extensions, const char* const* vk_inst_extensions, 
         uint32_t nr_dev_extensions, const char* const* dev_extensions, 
-        VkInstance* pInstance, VkDevice* pDevice, uint32_t* pQueue_family_index) 
+        VkInstance* pInstance, VkPhysicalDevice* pPhysicalDevice, VkDevice* pDevice, uint32_t* pQueue_family_index) 
 {
 
     VkResult result = volkInitialize();
@@ -103,6 +102,8 @@ VkResult init_vulkan(
     result = vkEnumeratePhysicalDevices(*pInstance, &nr_devices, devices);
     CHECK_ELSE_RETURN(result, "failed to enumerate all devices");
 
+    *pPhysicalDevice = devices[0]; // TODO add parameter to control what device to use, default 0
+
     // for (int i = 0; i < nr_devices; i++) {
     //     VkPhysicalDeviceProperties2 props = {0};
     //     props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -110,7 +111,7 @@ VkResult init_vulkan(
     //     printf("%s %s\n", props.properties.deviceName, string_VkPhysicalDeviceType(props.properties.deviceType));
     // }
 
-    result = create_device(pDevice, devices[0], pQueue_family_index, nr_dev_extensions, dev_extensions);
+    result = create_device(pDevice, *pPhysicalDevice, pQueue_family_index, nr_dev_extensions, dev_extensions);
     CHECK_ELSE_RETURN(result, "failed to create logical device");
 
     volkLoadDevice(*pDevice);

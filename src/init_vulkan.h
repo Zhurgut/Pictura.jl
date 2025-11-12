@@ -19,7 +19,7 @@
 VkResult init_vulkan(
         uint32_t nr_inst_extensions, const char* const* vk_inst_extensions, 
         uint32_t nr_dev_extensions, const char* const* dev_extensions, 
-        VkInstance* pInstance, VkDevice* pDevice, uint32_t* pQueue_family_index);
+        VkInstance* pInstance, VkPhysicalDevice* pPhysicalDevice, VkDevice* pDevice, uint32_t* pQueue_family_index) ;
 
 
 #endif 
