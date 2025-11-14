@@ -6,7 +6,7 @@ const sdl = @cImport({
     @cInclude("SDL3/SDL_vulkan.h");
 });
 
-const vulkan = @cImport({
+pub const vulkan = @cImport({
     @cInclude("src/init_vulkan.h");
 });
 
@@ -23,23 +23,103 @@ const PicturaApp = struct {
     swapchain: vulkan.VkSwapchainKHR,
     command_pool: vulkan.VkCommandPool,
     canvas: image.PicturaImage,
+    arena: std.heap.ArenaAllocator,
+    command_buffer_batch: CmdBufferBatch,
 };
 
 var app: PicturaApp = undefined;
+
+pub const CmdBufferBatch = struct {
+    allocator: std.mem.Allocator,
+    cmd_buffers: std.ArrayList(vulkan.VkCommandBufferSubmitInfo),
+    fence: vulkan.VkFence,
+    executing: bool,
+
+    pub fn create(allocator: std.mem.Allocator, device: vulkan.VkDevice) !CmdBufferBatch {
+        const list = try std.ArrayList(vulkan.VkCommandBufferSubmitInfo).initCapacity(allocator, 8);
+        std.debug.print("{s}", .{@typeName(@TypeOf(list))});
+
+        var fence: vulkan.VkFence = undefined;
+        const info: vulkan.VkFenceCreateInfo = .{
+            .sType = vulkan.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+        };
+        const result = vulkan.vkCreateFence.?(device, &info, null, &fence);
+        if (result != vulkan.VK_SUCCESS) {
+            std.debug.print("failed to create fence: {s}\n", .{vulkan.string_VkResult(result)});
+            return error.Vk_failed_to_create_fence;
+        }
+
+        return .{
+            .allocator = allocator,
+            .cmd_buffers = list,
+            .fence = fence,
+            .executing = false,
+        };
+    }
+
+    pub fn destroy(batch: *CmdBufferBatch, device: vulkan.VkDevice) void {
+        vulkan.vkDestroyFence.?(device, batch.fence, null);
+    }
+
+    pub fn append(batch: *CmdBufferBatch, cmd_buffer: vulkan.VkCommandBuffer) !void {
+        const info: vulkan.VkCommandBufferSubmitInfo = .{
+            .sType = vulkan.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+            .pNext = null,
+            .commandBuffer = cmd_buffer,
+            .deviceMask = 0,
+        };
+        try batch.cmd_buffers.append(batch.allocator, info);
+    }
+
+    pub fn submit_to_queue(batch: *CmdBufferBatch, queue: vulkan.VkQueue) !void {
+        var info = std.mem.zeroes(vulkan.VkSubmitInfo2);
+        info.sType = vulkan.VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        info.commandBufferInfoCount = @intCast(batch.cmd_buffers.items.len);
+        info.pCommandBufferInfos = @ptrCast(batch.cmd_buffers.items);
+
+        const result = vulkan.vkQueueSubmit2.?(queue, 1, &info, batch.fence);
+        if (result != vulkan.VK_SUCCESS) {
+            std.debug.print("failed to submit to queue: {s}\n", .{vulkan.string_VkResult(result)});
+            return error.Vk_failed_to_submit_to_queue;
+        }
+        batch.executing = true;
+    }
+
+    pub fn wait(batch: *CmdBufferBatch, device: vulkan.VkDevice) !void {
+        if (!batch.executing) {
+            return error.waiting_for_hwat;
+        }
+        var result = vulkan.vkWaitForFences.?(device, 1, &(batch.fence), 0, 1_000_000_000); // TODO std.math.maxInt(u64)
+        if (result != vulkan.VK_SUCCESS) {
+            std.debug.print("failed to wait for fence: {s}\n", .{vulkan.string_VkResult(result)});
+            return error.Vk_failed_to_wait_for_fence;
+        }
+
+        batch.executing = false;
+        result = vulkan.vkResetFences.?(device, 1, &(batch.fence));
+        if (result != vulkan.VK_SUCCESS) {
+            std.debug.print("failed to reset fence: {s}\n", .{vulkan.string_VkResult(result)});
+            return error.Vk_failed_to_reset_fence;
+        }
+        batch.cmd_buffers.clearRetainingCapacity();
+    }
+};
 
 pub fn print_error() void {
     std.debug.print("{s}\n", .{sdl.SDL_GetError()});
 }
 
 fn create_swapchain(device: vulkan.VkDevice, surface: vulkan.VkSurfaceKHR, w: u32, h: u32, old_swapchain: vulkan.VkSwapchainKHR) !vulkan.VkSwapchainKHR {
-    var info: vulkan.VkSwapchainCreateInfoKHR = std.mem.zeroes(vulkan.VkSwapchainCreateInfoKHR);
+    var info = std.mem.zeroes(vulkan.VkSwapchainCreateInfoKHR);
     info.sType = vulkan.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     info.surface = surface;
     info.minImageCount = 2; // TODO not to hardcode this
     info.imageFormat = vulkan.VK_FORMAT_R8G8B8A8_UNORM; // ???
     info.imageColorSpace = vulkan.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; // ??? imageFormat and imageColorSpace must match the format and colorSpace members, respectively, of one of the VkSurfaceFormatKHR structures returned by vkGetPhysicalDeviceSurfaceFormatsKHR for the surface
     info.imageExtent = .{ .width = w, .height = h };
-    info.imageArrayLayers = 1; // no idea what are these layers?
+    info.imageArrayLayers = 1;
     info.imageUsage = vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT; // ???
     info.preTransform = vulkan.VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     info.compositeAlpha = vulkan.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -58,7 +138,7 @@ fn create_swapchain(device: vulkan.VkDevice, surface: vulkan.VkSurfaceKHR, w: u3
 }
 
 fn create_command_pool(device: vulkan.VkDevice, queue_family_index: u32) !vulkan.VkCommandPool {
-    var info: vulkan.VkCommandPoolCreateInfo = std.mem.zeroes(vulkan.VkCommandPoolCreateInfo);
+    var info = std.mem.zeroes(vulkan.VkCommandPoolCreateInfo);
     info.sType = vulkan.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     info.flags = vulkan.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     info.queueFamilyIndex = queue_family_index;
@@ -155,8 +235,13 @@ fn _init(w: u32, h: u32, hdpi: bool) !void {
     const device_memory_index = get_device_memory_index(physical_device);
     std.debug.print("{d}", .{device_memory_index});
 
-    const canvas = try image.PicturaImage.create(w, h, device, queue_family_index, command_pool, 1);
+    var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, command_pool, 1);
     errdefer canvas.destroy(device, command_pool);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
+    errdefer arena.deinit();
+
+    const command_buffer_batch = try CmdBufferBatch.create(arena.allocator(), device);
 
     app = .{
         .window = window,
@@ -169,6 +254,8 @@ fn _init(w: u32, h: u32, hdpi: bool) !void {
         .swapchain = swapchain,
         .command_pool = command_pool,
         .canvas = canvas,
+        .arena = arena,
+        .command_buffer_batch = command_buffer_batch,
     };
 
     return;
@@ -176,6 +263,8 @@ fn _init(w: u32, h: u32, hdpi: bool) !void {
 
 pub export fn quit() void {
     _ = vulkan.vkDeviceWaitIdle.?(app.device);
+
+    app.command_buffer_batch.destroy(app.device);
 
     app.canvas.destroy(app.device, app.command_pool);
 
@@ -192,15 +281,28 @@ pub export fn quit() void {
 
     sdl.SDL_Quit();
 
-    app = std.mem.zeroes(PicturaApp);
+    app.arena.deinit();
+
+    // app = std.mem.zeroes(PicturaApp);
 }
 
 test "turn it on and off" {
-    const success = init(600, 400, false);
-    if (success == 0) {
-        try std.testing.expect(true);
-        quit();
-    } else {
-        try std.testing.expect(false);
-    }
+    try _init(600, 400, false);
+    try std.testing.expect(true);
+
+    try app.canvas.transition_to(
+        .recording_rendering,
+        app.queue_family_index,
+        &(app.command_buffer_batch),
+        app.device,
+        app.queue,
+    );
+    try app.canvas.transition_to(
+        .reset,
+        app.queue_family_index,
+        &(app.command_buffer_batch),
+        app.device,
+        app.queue,
+    );
+    quit();
 }

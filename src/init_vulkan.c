@@ -42,13 +42,16 @@ VkResult create_device(VkDevice* pDevice, VkPhysicalDevice physical_device, uint
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, &nr_families, fam_props);
 
     *pQueue_family_index = 0;
-    for (int i = nr_families-1; i >= 0; i--) {
+    for (int i = 0; i < nr_families; i--) {
         VkQueueFlagBits flags = fam_props[i].queueFamilyProperties.queueFlags;
-        if ((flags & VK_QUEUE_TRANSFER_BIT) && (flags & VK_QUEUE_COMPUTE_BIT)) {
+        if ((flags & VK_QUEUE_GRAPHICS_BIT) && (flags & VK_QUEUE_COMPUTE_BIT) && (flags & VK_QUEUE_TRANSFER_BIT)) {
             *pQueue_family_index = i;
             break;
         }
     }
+
+
+    
 
     float priority = 1.0;
     VkDeviceQueueCreateInfo queue_create_info = {0};
@@ -57,8 +60,19 @@ VkResult create_device(VkDevice* pDevice, VkPhysicalDevice physical_device, uint
     queue_create_info.queueCount = 1;
     queue_create_info.pQueuePriorities = &priority;
 
+
+    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering = {0};
+    dynamic_rendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dynamic_rendering.dynamicRendering = VK_TRUE;
+
+    VkPhysicalDeviceSynchronization2Features sync2_feature = {0};
+    sync2_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+    sync2_feature.pNext = &dynamic_rendering;
+    sync2_feature.synchronization2 = VK_TRUE;
+
     VkDeviceCreateInfo dev_create_info = {0};
     dev_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    dev_create_info.pNext = &sync2_feature;
     dev_create_info.queueCreateInfoCount = 1;
     dev_create_info.pQueueCreateInfos = &queue_create_info;
     dev_create_info.enabledExtensionCount = nr_extensions;
