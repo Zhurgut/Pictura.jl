@@ -20,6 +20,7 @@ pub const PicturaImage = struct {
     layout: vulkan.VkImageLayout,
     image_view: vulkan.VkImageView,
     command_buffer: vulkan.VkCommandBuffer,
+    era_of_submission: u64,
 
     pub fn create(w: u32, h: u32, device: vulkan.VkDevice, queue_family_index: u32, command_pool: vulkan.VkCommandPool, memory_type_index: u32) !PicturaImage {
         const image = try create_image(device, w, h, queue_family_index);
@@ -31,7 +32,7 @@ pub const PicturaImage = struct {
         const image_view = try create_image_view(image, device);
         errdefer vulkan.vkDestroyImageView.?(device, image_view, null);
 
-        const command_buffer = try create_command_buffer(device, command_pool);
+        const command_buffer = try root.create_command_buffer(device, command_pool);
 
         return PicturaImage{
             .w = w,
@@ -42,6 +43,7 @@ pub const PicturaImage = struct {
             .layout = vulkan.VK_IMAGE_LAYOUT_UNDEFINED,
             .image_view = image_view,
             .command_buffer = command_buffer,
+            .era_of_submission = 0,
         };
     }
 
@@ -66,16 +68,8 @@ pub const PicturaImage = struct {
             std.debug.print("failed to begin command buffer: {s}\n", .{vulkan.string_VkResult(result)});
             return error.Vk_failed_to_begin_command_buffer;
         }
-    }
 
-    fn end_cmd_buffer_and_submit(pimage: *PicturaImage, cmd_buffer_batch: *root.CmdBufferBatch, queue: vulkan.VkQueue) !void {
-        const result = vulkan.vkEndCommandBuffer.?(pimage.command_buffer);
-        if (result != vulkan.VK_SUCCESS) {
-            std.debug.print("failed to end command buffer: {s}\n", .{vulkan.string_VkResult(result)});
-            return error.Vk_failed_to_end_command_buffer;
-        }
-        try cmd_buffer_batch.append(pimage.command_buffer);
-        try cmd_buffer_batch.submit_to_queue(queue);
+        pimage.state = .recording;
     }
 
     fn begin_rendering(pimage: *PicturaImage, queue_family_index: u32) !void {
@@ -130,14 +124,42 @@ pub const PicturaImage = struct {
         };
 
         vulkan.vkCmdBeginRendering.?(pimage.command_buffer, &rendering_info);
+
+        pimage.state = .recording_rendering;
     }
 
     fn end_rendering(pimage: *PicturaImage) void {
         vulkan.vkCmdEndRendering.?(pimage.command_buffer);
+        pimage.state = .recording;
     }
 
-    fn wait_for_execution(cmd_buffer_batch: *root.CmdBufferBatch, device: vulkan.VkDevice) !void {
-        try cmd_buffer_batch.wait(device);
+    fn end_cmd_buffer(pimage: *PicturaImage) !void {
+        const result = vulkan.vkEndCommandBuffer.?(pimage.command_buffer);
+        if (result != vulkan.VK_SUCCESS) {
+            std.debug.print("failed to end command buffer: {s}\n", .{vulkan.string_VkResult(result)});
+            return error.Vk_failed_to_end_command_buffer;
+        }
+    }
+
+    fn submit_to_batch(pimage: *PicturaImage, cmd_buffer_batch: *root.CmdBufferBatch, device: vulkan.VkDevice) !void {
+        pimage.era_of_submission = try cmd_buffer_batch.append(pimage.command_buffer, device);
+        pimage.state = .submitted;
+    }
+
+    fn wait_for_execution(pimage: *PicturaImage, cmd_buffer_batch: *root.CmdBufferBatch, queue: vulkan.VkQueue, device: vulkan.VkDevice) !void {
+        if (cmd_buffer_batch.era > pimage.era_of_submission) {
+            pimage.state = .reset;
+            return;
+        }
+
+        if (cmd_buffer_batch.era == pimage.era_of_submission) {
+            if (!cmd_buffer_batch.executing) {
+                try cmd_buffer_batch.submit_to_queue(queue, null, null);
+            }
+            try cmd_buffer_batch.wait(device);
+        }
+
+        pimage.state = .reset;
     }
 
     pub fn transition_to(
@@ -148,7 +170,8 @@ pub const PicturaImage = struct {
         device: vulkan.VkDevice,
         queue: vulkan.VkQueue,
     ) !void {
-        switch (pimage.state) {
+        const initial_state = pimage.state;
+        switch (initial_state) {
             .reset => {
                 switch (target_state) {
                     .reset => return,
@@ -167,15 +190,17 @@ pub const PicturaImage = struct {
             .recording => {
                 switch (target_state) {
                     .reset => {
-                        try pimage.end_cmd_buffer_and_submit(cmd_buffer_batch, queue);
-                        try PicturaImage.wait_for_execution(cmd_buffer_batch, device);
+                        try pimage.end_cmd_buffer();
+                        try pimage.submit_to_batch(cmd_buffer_batch, device);
+                        try pimage.wait_for_execution(cmd_buffer_batch, queue, device);
                     },
                     .recording => return,
                     .recording_rendering => {
                         try pimage.begin_rendering(queue_family_index);
                     },
                     .submitted => {
-                        try pimage.end_cmd_buffer_and_submit(cmd_buffer_batch, queue);
+                        try pimage.end_cmd_buffer();
+                        try pimage.submit_to_batch(cmd_buffer_batch, device);
                     },
                 }
             },
@@ -183,8 +208,9 @@ pub const PicturaImage = struct {
                 switch (target_state) {
                     .reset => {
                         pimage.end_rendering();
-                        try pimage.end_cmd_buffer_and_submit(cmd_buffer_batch, queue);
-                        try PicturaImage.wait_for_execution(cmd_buffer_batch, device);
+                        try pimage.end_cmd_buffer();
+                        try pimage.submit_to_batch(cmd_buffer_batch, device);
+                        try pimage.wait_for_execution(cmd_buffer_batch, queue, device);
                     },
                     .recording => {
                         pimage.end_rendering();
@@ -192,21 +218,22 @@ pub const PicturaImage = struct {
                     .recording_rendering => return,
                     .submitted => {
                         pimage.end_rendering();
-                        try pimage.end_cmd_buffer_and_submit(cmd_buffer_batch, queue);
+                        try pimage.end_cmd_buffer();
+                        try pimage.submit_to_batch(cmd_buffer_batch, device);
                     },
                 }
             },
             .submitted => {
                 switch (target_state) {
                     .reset => {
-                        try PicturaImage.wait_for_execution(cmd_buffer_batch, device);
+                        try pimage.wait_for_execution(cmd_buffer_batch, queue, device);
                     },
                     .recording => {
-                        try PicturaImage.wait_for_execution(cmd_buffer_batch, device);
+                        try pimage.wait_for_execution(cmd_buffer_batch, queue, device);
                         try pimage.begin_cmd_buffer();
                     },
                     .recording_rendering => {
-                        try PicturaImage.wait_for_execution(cmd_buffer_batch, device);
+                        try pimage.wait_for_execution(cmd_buffer_batch, queue, device);
                         try pimage.begin_cmd_buffer();
                         try pimage.begin_rendering(queue_family_index);
                     },
@@ -214,7 +241,10 @@ pub const PicturaImage = struct {
                 }
             },
         }
-        pimage.state = target_state;
+        if (pimage.state != target_state) {
+            std.debug.print("was: {d}, target: {d}, is: {d}", .{ initial_state, target_state, pimage.state });
+            return error.inconsistent_state;
+        }
     }
 };
 
@@ -300,24 +330,4 @@ fn create_image_view(image: vulkan.VkImage, device: vulkan.VkDevice) !vulkan.VkI
     }
 
     return image_view;
-}
-
-fn create_command_buffer(device: vulkan.VkDevice, command_pool: vulkan.VkCommandPool) !vulkan.VkCommandBuffer {
-    const info: vulkan.VkCommandBufferAllocateInfo = .{
-        .sType = vulkan.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .pNext = null,
-        .commandPool = command_pool,
-        .level = vulkan.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-
-    var command_buffer: vulkan.VkCommandBuffer = undefined;
-    const result = vulkan.vkAllocateCommandBuffers.?(device, &info, &command_buffer);
-
-    if (result != vulkan.VK_SUCCESS) {
-        std.debug.print("failed to allocate command buffer: {s}\n", .{vulkan.string_VkResult(result)});
-        return error.Vk_failed_to_allocate_command_buffer;
-    }
-
-    return command_buffer;
 }
