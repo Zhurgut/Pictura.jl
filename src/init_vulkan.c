@@ -19,8 +19,10 @@ VkResult create_instance(uint32_t nr_extensions, const char* const* vk_extension
     VkInstanceCreateInfo info = {0};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     info.pApplicationInfo = &app_info;
-    info.enabledLayerCount = 1;
-    info.ppEnabledLayerNames = layers;
+
+    // info.enabledLayerCount = 1;
+    // info.ppEnabledLayerNames = layers;
+    
     info.enabledExtensionCount = nr_extensions;
     info.ppEnabledExtensionNames = vk_extensions;
 
