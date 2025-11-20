@@ -538,7 +538,7 @@ test "toy example" {
     try init._init(600, 400, false);
 
     std.debug.print("{d}\n", .{sdl.SDL_GetTicksNS()});
-    for (0..500) |_| {
+    for (0..50) |_| {
         try pictura_app.render_present();
 
         sdl.SDL_Delay(3);

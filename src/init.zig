@@ -41,21 +41,46 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     //     std.debug.print("{s}\n", .{ext});
     // }
 
-    const device_extensions = [_][*c]const u8{"VK_KHR_swapchain"};
-    const nr_device_extensions = device_extensions.len;
-
     var instance: vulkan.VkInstance = undefined;
     var physical_device: vulkan.VkPhysicalDevice = undefined;
+
+    var result = vulkan.create_instance_and_physical_device(nr_extensions, vk_extensions, &instance, &physical_device);
+    errdefer vulkan.vkDestroyInstance.?(instance, null);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create instance: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_initialize_vulkan;
+    }
+
+    var nr_available_exts: u32 = 0;
+    result = vulkan.vkEnumerateDeviceExtensionProperties.?(physical_device, null, &nr_available_exts, null);
+    std.debug.assert(500 >= nr_available_exts);
+    var available_dev_exts: [500]vulkan.VkExtensionProperties = undefined;
+    result = vulkan.vkEnumerateDeviceExtensionProperties.?(physical_device, null, &nr_available_exts, &available_dev_exts);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to enumerate device extensions: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_enumerate_dev_exts;
+    }
+
+    var pageable_mem_available = false;
+    for (0..nr_available_exts) |i| {
+        const len = std.mem.indexOfSentinel(u8, 0, @ptrCast(&available_dev_exts[i].extensionName));
+        if (std.mem.eql(u8, available_dev_exts[i].extensionName[0..len :0], "VK_EXT_pageable_device_local_memory")) {
+            std.debug.print("pageable device memory enabled\n", .{});
+            pageable_mem_available = true;
+            break;
+        }
+    }
+
+    const device_extensions = [3][*c]const u8{ "VK_KHR_swapchain", "VK_EXT_pageable_device_local_memory", "VK_EXT_memory_priority" };
+    const nr_device_extensions: u32 = if (pageable_mem_available) 3 else 1;
+
     var device: vulkan.VkDevice = undefined;
     var queue_family_index: u32 = 0;
 
-    const result = vulkan.init_vulkan(nr_extensions, vk_extensions, nr_device_extensions, &device_extensions, &instance, &physical_device, &device, &queue_family_index);
-    errdefer {
-        vulkan.vkDestroyDevice.?(device, null);
-        vulkan.vkDestroyInstance.?(instance, null);
-    }
+    result = vulkan.create_device(physical_device, &device, &queue_family_index, nr_device_extensions, &device_extensions);
+    errdefer vulkan.vkDestroyDevice.?(device, null);
     if (result != vulkan.VK_SUCCESS) {
-        std.debug.print("failed to initialize vulkan: {s}\n", .{vulkan.string_VkResult(result)});
+        std.debug.print("failed to create device: {s}\n", .{vulkan.string_VkResult(result)});
         return error.Vk_failed_to_initialize_vulkan;
     }
 
