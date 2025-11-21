@@ -92,7 +92,42 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     }
     errdefer sdl.SDL_Vulkan_DestroySurface(@ptrCast(instance), @ptrCast(surface), null);
 
-    const swapchain = try utils.create_swapchain(device, surface, w, h, null);
+    // getting ready to crate swapchain
+
+    var supported: vulkan.VkBool32 = vulkan.VK_FALSE;
+    result = vulkan.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device, queue_family_index, surface, &supported);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to check if surface is supported: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_initialize_vulkan;
+    }
+    if (supported == vulkan.VK_FALSE) {
+        return error.surface_not_supported_by_physical_device; // shrug
+    }
+
+    var capabilities: vulkan.VkSurfaceCapabilitiesKHR = undefined;
+    result = vulkan.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device, surface, &capabilities);
+    // min and max image count in swapchain, min max extent, ...
+    // supported transforms, supported usage flags
+    // std.debug.assert(capabilities.supportedUsageFlags & vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT != 0); // for example
+
+    var nr_formats: u32 = 0;
+    var formats: [20]vulkan.VkSurfaceFormatKHR = undefined;
+
+    result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, null);
+    std.debug.assert(20 > nr_formats);
+    result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, &formats);
+    for (0..nr_formats) |i| {
+        std.debug.print("{d} {d}\n", .{ formats[i].format, formats[i].colorSpace });
+    }
+
+    // for swapchain we want VK_FORMAT_B8G8R8A8_SRGB (must be srgb)
+    // for internal targets we want VK_FORMAT_R8G8B8A8_UNORM (because that's what we want on cpu side pixel array) TODO write function to choose format based on whats available
+
+    const swapchain_format = vulkan.VK_FORMAT_B8G8R8A8_SRGB;
+    image.format = vulkan.VK_FORMAT_R8G8B8A8_UNORM;
+    const color_space = formats[0].colorSpace; // srgb nonlinear
+
+    const swapchain = try utils.create_swapchain(device, surface, w, h, swapchain_format, color_space, null);
     errdefer vulkan.vkDestroySwapchainKHR.?(device, swapchain, null);
 
     const command_pool = try utils.create_command_pool(device, queue_family_index);

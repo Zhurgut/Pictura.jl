@@ -36,13 +36,13 @@ pub fn create_fence(device: vulkan.VkDevice, flags: vulkan.VkFenceCreateFlags) !
     return fence;
 }
 
-pub fn create_swapchain(device: vulkan.VkDevice, surface: vulkan.VkSurfaceKHR, w: u32, h: u32, old_swapchain: vulkan.VkSwapchainKHR) !vulkan.VkSwapchainKHR {
+pub fn create_swapchain(device: vulkan.VkDevice, surface: vulkan.VkSurfaceKHR, w: u32, h: u32, format: vulkan.VkFormat, colorspace: vulkan.VkColorSpaceKHR, old_swapchain: vulkan.VkSwapchainKHR) !vulkan.VkSwapchainKHR {
     var info = std.mem.zeroes(vulkan.VkSwapchainCreateInfoKHR);
     info.sType = vulkan.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     info.surface = surface;
     info.minImageCount = 3; // TODO not to hardcode this
-    info.imageFormat = vulkan.VK_FORMAT_R8G8B8A8_UNORM; // image and swapchains must have same format!
-    info.imageColorSpace = vulkan.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; // ??? imageFormat and imageColorSpace must match the format and colorSpace members, respectively, of one of the VkSurfaceFormatKHR structures returned by vkGetPhysicalDeviceSurfaceFormatsKHR for the surface
+    info.imageFormat = format; // image and swapchains must have same format!
+    info.imageColorSpace = colorspace; // ??? imageFormat and imageColorSpace must match the format and colorSpace members, respectively, of one of the VkSurfaceFormatKHR structures returned by vkGetPhysicalDeviceSurfaceFormatsKHR for the surface
     info.imageExtent = .{ .width = w, .height = h };
     info.imageArrayLayers = 1;
     info.imageUsage = vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT; // ???
@@ -108,11 +108,11 @@ pub fn get_device_memory_index(physical_device: vulkan.VkPhysicalDevice) usize {
     return 0;
 }
 
-pub fn create_image(device: vulkan.VkDevice, w: u32, h: u32, queue_family_index: u32) !vulkan.VkImage {
+pub fn create_image(device: vulkan.VkDevice, w: u32, h: u32, queue_family_index: u32, format: vulkan.VkFormat) !vulkan.VkImage {
     var info: vulkan.VkImageCreateInfo = std.mem.zeroes(vulkan.VkImageCreateInfo);
     info.sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     info.imageType = vulkan.VK_IMAGE_TYPE_2D;
-    info.format = vulkan.VK_FORMAT_R8G8B8A8_UNORM; // TODO remove hardcoding...
+    info.format = format;
     info.extent = .{ .width = w, .height = h, .depth = 1 };
     info.mipLevels = 1;
     info.arrayLayers = 1;
