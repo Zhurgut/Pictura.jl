@@ -46,11 +46,11 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var physical_device: vulkan.VkPhysicalDevice = undefined;
 
     var result = vulkan.create_instance_and_physical_device(nr_extensions, vk_extensions, &instance, &physical_device);
-    errdefer vulkan.vkDestroyInstance.?(instance, null);
     if (result != vulkan.VK_SUCCESS) {
         std.debug.print("failed to create instance: {s}\n", .{vulkan.string_VkResult(result)});
         return error.Vk_failed_to_initialize_vulkan;
     }
+    errdefer vulkan.vkDestroyInstance.?(instance, null);
 
     var nr_available_exts: u32 = 0;
     result = vulkan.vkEnumerateDeviceExtensionProperties.?(physical_device, null, &nr_available_exts, null);
@@ -79,11 +79,11 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var queue_family_index: u32 = 0;
 
     result = vulkan.create_device(physical_device, &device, &queue_family_index, nr_device_extensions, &device_extensions);
-    errdefer vulkan.vkDestroyDevice.?(device, null);
     if (result != vulkan.VK_SUCCESS) {
         std.debug.print("failed to create device: {s}\n", .{vulkan.string_VkResult(result)});
         return error.Vk_failed_to_initialize_vulkan;
     }
+    errdefer vulkan.vkDestroyDevice.?(device, null);
 
     var surface: vulkan.VkSurfaceKHR = undefined;
     success = sdl.SDL_Vulkan_CreateSurface(window, @ptrCast(instance), null, &surface);
@@ -95,7 +95,8 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
 
     image.format = vulkan.VK_FORMAT_R8G8B8A8_UNORM;
 
-    const swapchain2 = try swapchain.Swapchain.create(physical_device, device, queue_family_index, surface, w, h);
+    var swapchain2 = try swapchain.Swapchain.create(physical_device, device, queue_family_index, surface, w, h);
+    errdefer swapchain2.destroy(device);
 
     const command_pool = try utils.create_command_pool(device, queue_family_index);
     errdefer vulkan.vkDestroyCommandPool.?(device, command_pool, null);
@@ -134,14 +135,13 @@ pub export fn quit() void {
 
     _ = vulkan.vkDeviceWaitIdle.?(app.device);
 
-    // app.semaphores.destroy(app.device);
-
     app.well.destroy(app.device);
 
     app.canvas.destroy(app.device);
 
     vulkan.vkDestroyCommandPool.?(app.device, app.command_pool, null);
-    // vulkan.vkDestroySwapchainKHR.?(app.device, app.swapchain, null);
+
+    app.swapchain.destroy(app.device);
 
     sdl.SDL_Vulkan_DestroySurface(@ptrCast(app.instance), @ptrCast(app.surface), null);
 

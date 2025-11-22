@@ -24,6 +24,7 @@ pub const Swapchain = struct {
         _, const format, const colorspace = try get_infos(physical_device, queue_family_index, surface);
 
         const swapchain = try create_swapchain(device, surface, w, h, format, colorspace, null);
+        errdefer vulkan.vkDestroySwapchainKHR.?(device, swapchain, null);
 
         var count: u32 = 3;
         var images: [3]vulkan.VkImage = undefined;
@@ -44,30 +45,49 @@ pub const Swapchain = struct {
                 .layout = vulkan.VK_IMAGE_LAYOUT_UNDEFINED,
                 .image_view = try utils.create_image_view(images[i], device, format),
             };
+            errdefer {
+                vulkan.vkDestroyImageView.?(device, out.images[i].image_view, null);
+            }
         }
 
         out.semaphores = try SemaphoreClub(4).create(device);
+        errdefer out.semaphores.destroy(device);
 
         return out;
     }
 
     // pub fn recreate() Swapchain {}
 
-    // pub fn destroy() void {}
+    pub fn destroy(swapchain: *Swapchain, device: vulkan.VkDevice) void {
+        for (swapchain.images) |img| {
+            vulkan.vkDestroyImageView.?(device, img.image_view, null);
+        }
+        swapchain.semaphores.destroy(device);
+        vulkan.vkDestroySwapchainKHR.?(device, swapchain.swapchain, null);
+    }
 
     pub fn present(swapchain: *Swapchain, contents: *PicturaImage, app: *root.PicturaApp) !void {
-        const image_acquired_sm = try swapchain.semaphores.get_image_acquired_semaphore(app.device);
+        _ = try app.well.submit(app.device, app.queue, null, null, null, null); // we dont want all the previous work to wait for image acquired, so submit it right away
+
+        var image_acquired: vulkan.VkSemaphore = undefined;
+        const ready = try swapchain.semaphores.if_ready_get_image_acquired_semaphore(app.device, &image_acquired);
+
+        if (!ready) {
+            std.debug.print("-", .{});
+            return;
+        }
 
         var image_index: u32 = 0;
-        const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired_sm, null, &image_index);
+        const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired, null, &image_index); // on my pc always succeeds (since always calling present as well?)
 
         std.debug.assert(acquire_image_success != vulkan.VK_SUBOPTIMAL_KHR);
 
         if (acquire_image_success == vulkan.VK_NOT_READY) {
-            _ = try app.well.submit(app.device, app.queue, null, null, null, null);
             std.debug.print("-", .{});
             return;
         }
+
+        std.debug.print("*", .{});
 
         // otherwise, we are presenting!
 
@@ -146,7 +166,7 @@ pub const Swapchain = struct {
         try app.well.submit(
             app.device,
             app.queue,
-            image_acquired_sm,
+            image_acquired,
             vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             ready_to_present,
             vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
@@ -190,9 +210,15 @@ pub fn SemaphoreClub(comptime n: u32) type {
             var out: SemaphoreClub(n) = undefined;
             for (0..n) |i| {
                 out.image_acquired[i] = try utils.create_semaphore(device);
+                errdefer vulkan.vkDestroySemaphore.?(device, out.image_acquired[i], null);
+
                 out.fences[i] = try utils.create_fence(device, vulkan.VK_FENCE_CREATE_SIGNALED_BIT);
+                errdefer vulkan.vkDestroyFence.?(device, out.fences[i], null);
+
                 out.used_by_image_index[i] = -1;
+
                 out.ready_to_present[i] = try utils.create_semaphore(device);
+                errdefer vulkan.vkDestroySemaphore.?(device, out.ready_to_present[i], null);
             }
 
             return out;
@@ -201,19 +227,29 @@ pub fn SemaphoreClub(comptime n: u32) type {
         pub fn destroy(sems: *SemaphoreClub(n), device: vulkan.VkDevice) void {
             for (0..n) |i| {
                 vulkan.vkDestroySemaphore.?(device, sems.image_acquired[i], null);
-            }
-            for (0..sems.ready_to_present.len) |i| {
                 vulkan.vkDestroySemaphore.?(device, sems.ready_to_present[i], null);
+                vulkan.vkDestroyFence.?(device, sems.fences[i], null);
             }
         }
 
-        pub fn get_image_acquired_semaphore(sems: *SemaphoreClub(n), device: vulkan.VkDevice) !vulkan.VkSemaphore {
+        pub fn if_ready_get_image_acquired_semaphore(sems: *SemaphoreClub(n), device: vulkan.VkDevice, sm: *vulkan.VkSemaphore) !bool {
             for (0..n) |i| {
                 if (sems.used_by_image_index[i] == -1) {
-                    try utils.wait_and_reset_fence(device, &sems.fences[i]);
+                    var result = vulkan.vkGetFenceStatus.?(device, sems.fences[i]);
+                    if (result == vulkan.VK_NOT_READY) {
+                        return false;
+                    }
+
+                    result = vulkan.vkResetFences.?(device, 1, &sems.fences[i]);
+                    if (result != vulkan.VK_SUCCESS) {
+                        std.debug.print("failed to reset fence: {s}\n", .{vulkan.string_VkResult(result)});
+                        return error.Vk_failed_to_reset_fence;
+                    }
 
                     sems.last_image_acquired_semaphore_index = @intCast(i);
-                    return sems.image_acquired[i];
+                    sm.* = sems.image_acquired[i];
+
+                    return true;
                 }
             }
             unreachable;
@@ -228,7 +264,7 @@ pub fn SemaphoreClub(comptime n: u32) type {
                 }
             }
             sems.used_by_image_index[sems.last_image_acquired_semaphore_index] = @intCast(idx);
-            std.debug.print("[{d}] {d} {d} {d} {d}\n", .{ idx, sems.used_by_image_index[0], sems.used_by_image_index[1], sems.used_by_image_index[2], sems.used_by_image_index[3] });
+            // std.debug.print("[{d}] {d} {d} {d} {d}\n", .{ idx, sems.used_by_image_index[0], sems.used_by_image_index[1], sems.used_by_image_index[2], sems.used_by_image_index[3] });
         }
 
         pub fn submitted_acquired_semaphore(sems: *SemaphoreClub(n), queue: vulkan.VkQueue) !void {

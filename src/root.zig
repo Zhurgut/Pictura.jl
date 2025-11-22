@@ -30,7 +30,7 @@ pub const PicturaApp = struct {
     swapchain: swapchain.Swapchain,
     command_pool: vulkan.VkCommandPool,
     canvas: image.PicturaImage,
-    well: WellOfCommands(2),
+    well: WellOfCommands(128),
 };
 
 // command buffers to cycle through
@@ -362,13 +362,14 @@ pub export fn PL_init(w: u32, h: u32, hdpi: bool) u32 {
 test "toy example" {
     try init._init(600, 400, false);
 
-    std.debug.print("{d}\n", .{sdl.SDL_GetTicksNS()});
-    for (0..150) |_| {
+    const start = sdl.SDL_GetTicksNS();
+    for (0..100) |_| {
         try pictura_app.swapchain.present(&pictura_app.canvas, &pictura_app);
-        sdl.SDL_Delay(3);
+        sdl.SDL_Delay(2);
     }
+    const stop = sdl.SDL_GetTicksNS();
+    std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
-    std.debug.print("{d}\n", .{sdl.SDL_GetTicksNS()});
 
     init.quit();
 }
