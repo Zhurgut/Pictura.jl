@@ -8,16 +8,18 @@ pub const sdl = @cImport({
 });
 
 pub const vulkan = @cImport({
-    @cInclude("src/init_vulkan.h");
+    @cInclude("src/init/init_vulkan.h");
 });
 
-pub const init = @import("init.zig");
+pub const init = @import("init/init.zig");
 pub const image = @import("image.zig");
 pub const utils = @import("utils.zig");
+pub const swapchain = @import("init/swapchain.zig");
+pub const shaders = @import("init/shaders.zig");
 
 pub var pictura_app: PicturaApp = undefined;
 
-const PicturaApp = struct {
+pub const PicturaApp = struct {
     window: ?*sdl.struct_SDL_Window,
     instance: vulkan.VkInstance,
     physical_device: vulkan.VkPhysicalDevice,
@@ -25,197 +27,11 @@ const PicturaApp = struct {
     queue_family_index: u32,
     queue: vulkan.VkQueue,
     surface: vulkan.VkSurfaceKHR,
-    swapchain: vulkan.VkSwapchainKHR,
-    swapchain_layouts: [3]vulkan.VkImageLayout,
+    swapchain: swapchain.Swapchain,
     command_pool: vulkan.VkCommandPool,
     canvas: image.PicturaImage,
     well: WellOfCommands(2),
-    semaphores: SemaphoreCircle(16),
-
-    fn copy_canvas_to_swapchain(app: *PicturaApp, swapchain_image: vulkan.VkImage, layout: vulkan.VkImageLayout) !void {
-        const command_buffer = try app.well.record(app.device);
-        const swapchain_image_layout = vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        const new_layout = vulkan.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-
-        const subresource_layers: vulkan.VkImageSubresourceLayers = .{
-            .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
-            .mipLevel = 0,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        };
-
-        // change layout for writes
-
-        var swapchain_image_barrier: vulkan.VkImageMemoryBarrier2 = .{
-            .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .pNext = null,
-            .srcStageMask = vulkan.VK_PIPELINE_STAGE_2_NONE,
-            .srcAccessMask = vulkan.VK_ACCESS_NONE,
-            .dstStageMask = vulkan.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT,
-            .dstAccessMask = vulkan.VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = layout,
-            .newLayout = swapchain_image_layout,
-            .srcQueueFamilyIndex = app.queue_family_index,
-            .dstQueueFamilyIndex = app.queue_family_index,
-            .image = swapchain_image,
-            .subresourceRange = .{
-                .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-
-        const canvas_barrier: vulkan.VkImageMemoryBarrier2 = .{
-            .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .pNext = null,
-            .srcStageMask = vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .srcAccessMask = vulkan.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstStageMask = vulkan.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR,
-            .dstAccessMask = vulkan.VK_ACCESS_2_MEMORY_READ_BIT,
-            .oldLayout = app.canvas.layout,
-            .newLayout = new_layout,
-            .srcQueueFamilyIndex = app.queue_family_index,
-            .dstQueueFamilyIndex = app.queue_family_index,
-            .image = app.canvas.image,
-            .subresourceRange = .{
-                .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-        app.canvas.layout = new_layout;
-
-        const barriers = [_]vulkan.VkImageMemoryBarrier2{ swapchain_image_barrier, canvas_barrier };
-
-        var dep_info: vulkan.VkDependencyInfo = std.mem.zeroes(vulkan.VkDependencyInfo);
-        dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dep_info.imageMemoryBarrierCount = 2;
-        dep_info.pImageMemoryBarriers = &barriers;
-
-        vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
-
-        const copy: vulkan.VkImageCopy = .{
-            .srcSubresource = subresource_layers,
-            .srcOffset = .{ .x = 0, .y = 0, .z = 0 },
-            .dstSubresource = subresource_layers,
-            .dstOffset = .{ .x = 0, .y = 0, .z = 0 },
-            .extent = .{ .width = app.canvas.w, .height = app.canvas.h, .depth = 1 },
-        };
-        vulkan.vkCmdCopyImage.?(command_buffer, app.canvas.image, new_layout, swapchain_image, swapchain_image_layout, 1, &copy);
-
-        swapchain_image_barrier = .{
-            .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .pNext = null,
-            .srcStageMask = vulkan.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT,
-            .srcAccessMask = vulkan.VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstStageMask = vulkan.VK_PIPELINE_STAGE_2_NONE, // docs say bottom of pipe, chatgpt says "none" is modern sync2 way
-            .dstAccessMask = 0,
-            .oldLayout = swapchain_image_layout,
-            .newLayout = vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .srcQueueFamilyIndex = app.queue_family_index,
-            .dstQueueFamilyIndex = app.queue_family_index,
-            .image = swapchain_image,
-            .subresourceRange = .{
-                .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-
-        dep_info = std.mem.zeroes(vulkan.VkDependencyInfo);
-        dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dep_info.imageMemoryBarrierCount = 1;
-        dep_info.pImageMemoryBarriers = &swapchain_image_barrier;
-
-        vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
-    }
-
-    pub fn render_present(app: *PicturaApp) !void {
-        const image_acquired = app.semaphores.get();
-        const ready_to_present = app.semaphores.get();
-
-        var image_index: u32 = 0;
-        const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, app.swapchain, 0, image_acquired, null, &image_index);
-
-        assert(acquire_image_success != vulkan.VK_SUBOPTIMAL_KHR);
-
-        if (acquire_image_success == vulkan.VK_NOT_READY) {
-            try app.well.submit(app.device, app.queue, null, null, null, null);
-            std.debug.print("-", .{});
-            return;
-        }
-
-        // otherwise, we are presenting!
-
-        var count: u32 = 3;
-        assert(image_index < count);
-        var images: [3]vulkan.VkImage = undefined;
-        var result = vulkan.vkGetSwapchainImagesKHR.?(app.device, app.swapchain, &count, &images);
-        if (result != vulkan.VK_SUCCESS and result != vulkan.VK_INCOMPLETE) {
-            std.debug.print("failed to get swapchain images: {s}\n", .{vulkan.string_VkResult(result)});
-            return error.Vk_failed_to_present;
-        }
-
-        const swapchain_image = images[image_index];
-
-        try app.copy_canvas_to_swapchain(swapchain_image, app.swapchain_layouts[image_index]);
-
-        app.swapchain_layouts[image_index] = vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-        try app.well.submit(app.device, app.queue, image_acquired, vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, ready_to_present, vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
-
-        const present_info: vulkan.VkPresentInfoKHR = .{
-            .sType = vulkan.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .pNext = null,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &(ready_to_present),
-            .swapchainCount = 1,
-            .pSwapchains = &(app.swapchain),
-            .pImageIndices = &image_index,
-            .pResults = null,
-        };
-
-        result = vulkan.vkQueuePresentKHR.?(app.queue, &present_info);
-        if (result != vulkan.VK_SUCCESS) {
-            std.debug.print("failed to present: {s}\n", .{vulkan.string_VkResult(result)});
-            return error.Vk_failed_to_present;
-        }
-    }
 };
-
-pub fn SemaphoreCircle(comptime n: u32) type {
-    return struct {
-        crt: u32,
-        semaphores: [n]vulkan.VkSemaphore,
-
-        pub fn create(device: vulkan.VkDevice) !SemaphoreCircle(n) {
-            var out: SemaphoreCircle(n) = undefined;
-            out.crt = 0;
-            for (0..n) |i| {
-                out.semaphores[i] = try utils.create_semaphore(device);
-            }
-            return out;
-        }
-
-        pub fn destroy(sems: *SemaphoreCircle(n), device: vulkan.VkDevice) void {
-            for (0..n) |i| {
-                vulkan.vkDestroySemaphore.?(device, sems.semaphores[i], null);
-            }
-        }
-
-        pub fn get(sems: *SemaphoreCircle(n)) vulkan.VkSemaphore {
-            const out = sems.semaphores[sems.crt];
-            sems.crt = (sems.crt + 1) % n;
-            return out;
-        }
-    };
-}
 
 // command buffers to cycle through
 pub fn WellOfCommands(comptime n: u32) type {
@@ -295,7 +111,7 @@ pub fn WellOfCommands(comptime n: u32) type {
             return well.command_buffers[well.crt_index];
         }
 
-        pub fn render(well: *WellOfCommands(n), pimage: image.PicturaImage, device: vulkan.VkDevice, queue_family_index: u32) vulkan.VkCommandBuffer {
+        pub fn render_into(well: *WellOfCommands(n), pimage: image.PicturaImage, device: vulkan.VkDevice, queue_family_index: u32) vulkan.VkCommandBuffer {
             switch (well.state) {
                 .ready => {
                     well.begin_cmd_buffer(device);
@@ -312,7 +128,16 @@ pub fn WellOfCommands(comptime n: u32) type {
             return well.command_buffers[well.crt_index];
         }
 
-        pub fn submit(well: *WellOfCommands(n), device: vulkan.VkDevice, queue: vulkan.VkQueue, additional_wait: ?vulkan.VkSemaphore, wait_stage: ?vulkan.VkPipelineStageFlags2, additional_signal: ?vulkan.VkSemaphore, signal_stage: ?vulkan.VkPipelineStageFlags2) !void {
+        // do not reset fence returned by this!
+        pub fn submit(
+            well: *WellOfCommands(n),
+            device: vulkan.VkDevice,
+            queue: vulkan.VkQueue,
+            additional_wait: ?vulkan.VkSemaphore,
+            wait_stage: ?vulkan.VkPipelineStageFlags2,
+            additional_signal: ?vulkan.VkSemaphore,
+            signal_stage: ?vulkan.VkPipelineStageFlags2,
+        ) !void {
             switch (well.state) {
                 .ready => {
                     try well.begin_cmd_buffer(device);
@@ -538,9 +363,8 @@ test "toy example" {
     try init._init(600, 400, false);
 
     std.debug.print("{d}\n", .{sdl.SDL_GetTicksNS()});
-    for (0..50) |_| {
-        try pictura_app.render_present();
-
+    for (0..150) |_| {
+        try pictura_app.swapchain.present(&pictura_app.canvas, &pictura_app);
         sdl.SDL_Delay(3);
     }
     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);

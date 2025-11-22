@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) void {
     lib_mod.addIncludePath(.{ .cwd_relative = "C:/VulkanSDK/1.4.328.1/Include" });
     // lib_mod.addIncludePath(.{ .cwd_relative = "./" });
 
-    lib_mod.addCSourceFile(.{ .file = .{ .cwd_relative = "src/init_vulkan.c" } });
+    lib_mod.addCSourceFile(.{ .file = .{ .cwd_relative = "src/init/init_vulkan.c" } });
 
     if (builtin.os.tag == .windows) {
         lib_mod.linkSystemLibrary("user32", .{});
@@ -54,6 +54,10 @@ pub fn build(b: *std.Build) void {
         .root_module = lib_mod,
     });
 
+    // const shader1 = compile_shader(b, "src/init/shaders/fragment/texture_sample.frag", "../.zig-cache/shaders/texture_sample.spv");
+
+    // lib.step.dependOn(shader1);
+
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).
@@ -72,4 +76,14 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
+}
+
+fn compile_shader(b: *std.Build, srcPath: []const u8, outPath: []const u8) *std.Build.Step {
+    const run = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V" });
+    // add the source file as a FileSource argument so Zig tracks it as input
+    run.addFileSourceArg(b.path(srcPath));
+    // add -o and the output path
+    run.addArg("-o");
+    run.addArg(outPath);
+    return run;
 }

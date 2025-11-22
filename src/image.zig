@@ -5,15 +5,15 @@ const root = @import("root.zig");
 const vulkan = root.vulkan;
 const utils = root.utils;
 
-pub var format: vulkan.VkFormat = undefined;
+pub var format: vulkan.VkFormat = undefined; // the standart format for PicturaImages, set during init
 
 pub const PicturaImage = struct {
     w: u32,
     h: u32,
-    memory: vulkan.VkDeviceMemory,
+    memory: ?vulkan.VkDeviceMemory,
     image: vulkan.VkImage,
     layout: vulkan.VkImageLayout,
-    image_view: vulkan.VkImageView,
+    image_view: vulkan.VkImageView, // we always just need one view, we dont do anything fancy with these
 
     pub fn create(w: u32, h: u32, device: vulkan.VkDevice, queue_family_index: u32, memory_type_index: u32) !PicturaImage {
         const image = try utils.create_image(device, w, h, queue_family_index, format);
@@ -22,7 +22,7 @@ pub const PicturaImage = struct {
         const memory = try utils.bind_image_memory(device, image, memory_type_index);
         errdefer vulkan.vkFreeMemory.?(device, memory, null);
 
-        const image_view = try utils.create_image_view(image, device);
+        const image_view = try utils.create_image_view(image, device, format);
         errdefer vulkan.vkDestroyImageView.?(device, image_view, null);
 
         return PicturaImage{
@@ -37,7 +37,10 @@ pub const PicturaImage = struct {
 
     pub fn destroy(pimage: *PicturaImage, device: vulkan.VkDevice) void {
         vulkan.vkDestroyImageView.?(device, pimage.image_view, null);
-        vulkan.vkFreeMemory.?(device, pimage.memory, null);
+        if (pimage.memory) |mem| {
+            vulkan.vkFreeMemory.?(device, mem, null);
+        }
+
         vulkan.vkDestroyImage.?(device, pimage.image, null);
 
         pimage.* = std.mem.zeroes(PicturaImage);

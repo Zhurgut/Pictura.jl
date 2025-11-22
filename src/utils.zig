@@ -36,32 +36,6 @@ pub fn create_fence(device: vulkan.VkDevice, flags: vulkan.VkFenceCreateFlags) !
     return fence;
 }
 
-pub fn create_swapchain(device: vulkan.VkDevice, surface: vulkan.VkSurfaceKHR, w: u32, h: u32, format: vulkan.VkFormat, colorspace: vulkan.VkColorSpaceKHR, old_swapchain: vulkan.VkSwapchainKHR) !vulkan.VkSwapchainKHR {
-    var info = std.mem.zeroes(vulkan.VkSwapchainCreateInfoKHR);
-    info.sType = vulkan.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    info.surface = surface;
-    info.minImageCount = 3; // TODO not to hardcode this
-    info.imageFormat = format; // image and swapchains must have same format!
-    info.imageColorSpace = colorspace; // ??? imageFormat and imageColorSpace must match the format and colorSpace members, respectively, of one of the VkSurfaceFormatKHR structures returned by vkGetPhysicalDeviceSurfaceFormatsKHR for the surface
-    info.imageExtent = .{ .width = w, .height = h };
-    info.imageArrayLayers = 1;
-    info.imageUsage = vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT; // ???
-    info.preTransform = vulkan.VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    info.compositeAlpha = vulkan.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    info.presentMode = vulkan.VK_PRESENT_MODE_FIFO_KHR;
-    info.oldSwapchain = old_swapchain;
-
-    var swapchain: vulkan.VkSwapchainKHR = undefined;
-    const result = vulkan.vkCreateSwapchainKHR.?(device, &info, null, &swapchain);
-
-    if (result != vulkan.VK_SUCCESS) {
-        std.debug.print("failed to create swapchain: {s}\n", .{vulkan.string_VkResult(result)});
-        return error.Vk_failed_to_create_swapchain;
-    }
-
-    return swapchain;
-}
-
 pub fn create_command_pool(device: vulkan.VkDevice, queue_family_index: u32) !vulkan.VkCommandPool {
     var info = std.mem.zeroes(vulkan.VkCommandPoolCreateInfo);
     info.sType = vulkan.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -162,12 +136,12 @@ pub fn bind_image_memory(device: vulkan.VkDevice, image: vulkan.VkImage, mem_typ
     return memory;
 }
 
-pub fn create_image_view(image: vulkan.VkImage, device: vulkan.VkDevice) !vulkan.VkImageView {
+pub fn create_image_view(image: vulkan.VkImage, device: vulkan.VkDevice, format: vulkan.VkFormat) !vulkan.VkImageView {
     var info: vulkan.VkImageViewCreateInfo = std.mem.zeroes(vulkan.VkImageViewCreateInfo);
     info.sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     info.image = image;
     info.viewType = vulkan.VK_IMAGE_VIEW_TYPE_2D;
-    info.format = vulkan.VK_FORMAT_R8G8B8A8_UNORM;
+    info.format = format;
     info.components = .{
         .r = vulkan.VK_COMPONENT_SWIZZLE_IDENTITY,
         .g = vulkan.VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -257,3 +231,40 @@ pub fn wait_and_reset_fence(device: vulkan.VkDevice, pfence: *vulkan.VkFence) !v
         return error.Vk_failed_to_reset_fence;
     }
 }
+
+pub fn image_memory_barrier(
+    image: *root.image.PicturaImage,
+    new_layout: vulkan.VkImageLayout,
+    queue_family_index: u32,
+    src_stage: vulkan.VkPipelineStageFlags2,
+    src_access: vulkan.VkAccessFlags2,
+    dst_stage: vulkan.VkPipelineStageFlags2,
+    dst_access: vulkan.VkAccessFlags2,
+) vulkan.VkImageMemoryBarrier2 {
+    const old_layout = image.layout;
+    const barrier: vulkan.VkImageMemoryBarrier2 = .{
+        .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .pNext = null,
+        .srcStageMask = src_stage,
+        .srcAccessMask = src_access,
+        .dstStageMask = dst_stage,
+        .dstAccessMask = dst_access,
+        .oldLayout = old_layout,
+        .newLayout = new_layout,
+        .srcQueueFamilyIndex = queue_family_index,
+        .dstQueueFamilyIndex = queue_family_index,
+        .image = image.image,
+        .subresourceRange = .{
+            .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
+    };
+    image.layout = new_layout;
+
+    return barrier;
+}
+
+// pub fn two_stage_graphics_pipeline() vulkan.
