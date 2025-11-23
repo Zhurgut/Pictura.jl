@@ -1,9 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    // var alc = std.heap.GeneralPurposeAllocator(.{}).init;
+    // const gpa = alc.allocator();
 
     // This creates a "module", which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
@@ -54,9 +57,9 @@ pub fn build(b: *std.Build) void {
         .root_module = lib_mod,
     });
 
-    // const shader1 = compile_shader(b, "src/init/shaders/fragment/texture_sample.frag", "../.zig-cache/shaders/texture_sample.spv");
+    const shaders = try compile_shaders(b);
 
-    // lib.step.dependOn(shader1);
+    lib.step.dependOn(&shaders.step);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -69,6 +72,8 @@ pub fn build(b: *std.Build) void {
         .root_module = lib_mod,
     });
 
+    lib_unit_tests.step.dependOn(&shaders.step);
+
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
@@ -78,12 +83,50 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
 }
 
-fn compile_shader(b: *std.Build, srcPath: []const u8, outPath: []const u8) *std.Build.Step {
-    const run = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V" });
-    // add the source file as a FileSource argument so Zig tracks it as input
-    run.addFileSourceArg(b.path(srcPath));
-    // add -o and the output path
-    run.addArg("-o");
-    run.addArg(outPath);
-    return run;
+fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
+    var alc = std.heap.GeneralPurposeAllocator(.{}).init;
+    const gpa = alc.allocator();
+
+    const usf = std.Build.Step.UpdateSourceFiles.create(b);
+
+    const shader_file = try std.fs.cwd().createFile("src/shaders.zig", .{});
+    defer shader_file.close();
+
+    var buffer: [1024]u8 = undefined;
+
+    var writer = shader_file.writer(&buffer);
+    var shaders_zig_out = &writer.interface;
+
+    const dir = try std.fs.cwd().openDir("src/shaders", .{ .iterate = true });
+    var walker = try dir.walk(gpa);
+
+    var entry = try walker.next();
+    while (entry) |e| {
+        if (e.kind == .file) {
+            const path = try std.mem.concat(gpa, u8, &.{ "src\\shaders\\", e.path });
+            const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
+            const out_filename = try std.fmt.allocPrint(gpa, "{s}.spv", .{shadername});
+            const out_file_path = try std.fmt.allocPrint(gpa, ".spirv/{s}.spv", .{shadername});
+            // std.debug.print("{s} {s}\n", .{ e.basename, path });
+
+            var compile_shader = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V" });
+            try compile_shader.step.addWatchInput(b.path(path));
+            compile_shader.addFileArg(b.path(path));
+            compile_shader.addArg("-o");
+            const shader_output = compile_shader.addOutputFileArg(out_filename);
+
+            // std.debug.print("ofp: {s}\n", .{out_file_path});
+
+            // usf.step.dependOn(&compile_shader.step);
+
+            usf.addCopyFileToSource(shader_output, out_file_path);
+
+            try shaders_zig_out.print("const {s}_spv = @embedFile(\"../.spirv/{s}.spv\");\n", .{ shadername, shadername });
+            try shaders_zig_out.flush();
+        }
+
+        entry = try walker.next();
+    }
+
+    return usf;
 }

@@ -267,4 +267,24 @@ pub fn image_memory_barrier(
     return barrier;
 }
 
+fn create_shader_module(spv_file: anytype, device: vulkan.VkDevice) !vulkan.VkShaderModule {
+    const info: vulkan.VkShaderModuleCreateInfo = .{
+        .sType = vulkan.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = null,
+        .flags = 0,
+        .codeSize = spv_file.len,
+        .pCode = @alignCast(spv_file.ptr),
+    };
+
+    var shader: vulkan.VkShaderModule = undefined;
+    const result = vulkan.vkCreateShaderModule(device, &info, null, &shader);
+
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create shader module: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_shader_module;
+    }
+
+    return shader;
+}
+
 // pub fn two_stage_graphics_pipeline() vulkan.
