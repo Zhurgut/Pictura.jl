@@ -100,33 +100,111 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
     const dir = try std.fs.cwd().openDir("src/shaders", .{ .iterate = true });
     var walker = try dir.walk(gpa);
 
+    try shaders_zig_out.print(
+        \\const root = @import("root.zig");
+        \\const vulkan = root.vulkan;
+        \\const utils = root.utils;
+        \\
+        \\
+    , .{});
+
     var entry = try walker.next();
     while (entry) |e| {
-        if (e.kind == .file) {
-            const path = try std.mem.concat(gpa, u8, &.{ "src\\shaders\\", e.path });
-            const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
-            const out_filename = try std.fmt.allocPrint(gpa, "{s}.spv", .{shadername});
-            const out_file_path = try std.fmt.allocPrint(gpa, ".spirv/{s}.spv", .{shadername});
-            // std.debug.print("{s} {s}\n", .{ e.basename, path });
-
-            var compile_shader = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V" });
-            try compile_shader.step.addWatchInput(b.path(path));
-            compile_shader.addFileArg(b.path(path));
-            compile_shader.addArg("-o");
-            const shader_output = compile_shader.addOutputFileArg(out_filename);
-
-            // std.debug.print("ofp: {s}\n", .{out_file_path});
-
-            // usf.step.dependOn(&compile_shader.step);
-
-            usf.addCopyFileToSource(shader_output, out_file_path);
-
-            try shaders_zig_out.print("const {s}_spv = @embedFile(\"../.spirv/{s}.spv\");\n", .{ shadername, shadername });
-            try shaders_zig_out.flush();
+        if (e.kind != .file) {
+            entry = try walker.next();
+            continue;
         }
+
+        const path = try std.mem.concat(gpa, u8, &.{ "src\\shaders\\", e.path });
+        const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
+        const out_filename = try std.fmt.allocPrint(gpa, "{s}.spv", .{shadername});
+        const out_file_path = try std.fmt.allocPrint(gpa, "src/.spirv/{s}.spv", .{shadername});
+
+        var compile_shader = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V" });
+        compile_shader.addFileArg(b.path(path));
+        compile_shader.addArg("-o");
+        const shader_output = compile_shader.addOutputFileArg(out_filename);
+
+        usf.addCopyFileToSource(shader_output, out_file_path);
+
+        try shaders_zig_out.print("const {s}_spv align(64) = @embedFile(\".spirv/{s}.spv\").*;\n", .{ shadername, shadername });
 
         entry = try walker.next();
     }
+
+    try shaders_zig_out.print("\npub const ShaderModules = struct {{\n", .{});
+
+    walker = try dir.walk(gpa);
+
+    entry = try walker.next();
+    while (entry) |e| {
+        if (e.kind != .file) {
+            entry = try walker.next();
+            continue;
+        }
+
+        const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
+
+        try shaders_zig_out.print("\t\t{s}: vulkan.VkShaderModule,\n", .{shadername});
+
+        entry = try walker.next();
+    }
+
+    try shaders_zig_out.print(
+        \\
+        \\    pub fn init(device: vulkan.VkDevice) !ShaderModules {{
+        \\        return .{{
+        \\
+    , .{});
+
+    walker = try dir.walk(gpa);
+
+    entry = try walker.next();
+    while (entry) |e| {
+        if (e.kind != .file) {
+            entry = try walker.next();
+            continue;
+        }
+
+        const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
+
+        try shaders_zig_out.print("\t\t\t.{s} = try utils.create_shader_module(&{s}_spv, device),\n", .{ shadername, shadername });
+
+        entry = try walker.next();
+    }
+
+    try shaders_zig_out.print(
+        \\        }};
+        \\    }}
+        \\
+        \\    pub fn destroy(s: *ShaderModules, device: vulkan.VkDevice) void {{
+        \\
+    , .{});
+
+    walker = try dir.walk(gpa);
+
+    entry = try walker.next();
+    while (entry) |e| {
+        if (e.kind != .file) {
+            entry = try walker.next();
+            continue;
+        }
+
+        const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
+
+        try shaders_zig_out.print("\t\tvulkan.vkDestroyShaderModule.?(device, s.{s}, null);\n", .{shadername});
+
+        entry = try walker.next();
+    }
+
+    try shaders_zig_out.print(
+        \\    }}
+        \\}};
+        \\
+        \\pub var modules: ShaderModules = undefined;
+    , .{});
+
+    try shaders_zig_out.flush();
 
     return usf;
 }

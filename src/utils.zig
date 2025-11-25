@@ -267,17 +267,19 @@ pub fn image_memory_barrier(
     return barrier;
 }
 
-fn create_shader_module(spv_file: anytype, device: vulkan.VkDevice) !vulkan.VkShaderModule {
+pub fn create_shader_module(spv_ptr: anytype, device: vulkan.VkDevice) !vulkan.VkShaderModule {
+    std.debug.print("{*}*{d}\n", .{ spv_ptr, spv_ptr.len });
+
     const info: vulkan.VkShaderModuleCreateInfo = .{
         .sType = vulkan.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = null,
         .flags = 0,
-        .codeSize = spv_file.len,
-        .pCode = @alignCast(spv_file.ptr),
+        .codeSize = spv_ptr.len,
+        .pCode = @ptrCast(@alignCast(spv_ptr)),
     };
 
     var shader: vulkan.VkShaderModule = undefined;
-    const result = vulkan.vkCreateShaderModule(device, &info, null, &shader);
+    const result = vulkan.vkCreateShaderModule.?(device, &info, null, &shader);
 
     if (result != vulkan.VK_SUCCESS) {
         std.debug.print("failed to create shader module: {s}\n", .{vulkan.string_VkResult(result)});
@@ -287,4 +289,98 @@ fn create_shader_module(spv_file: anytype, device: vulkan.VkDevice) !vulkan.VkSh
     return shader;
 }
 
-// pub fn two_stage_graphics_pipeline() vulkan.
+pub fn two_stage_graphics_pipeline(
+    device: vulkan.VkDevice,
+    dst_format: vulkan.VkFormat,
+    vertex_shader: vulkan.VkShaderModule,
+    fragment_shader: vulkan.VkShaderModule,
+    pipeline_layout: vulkan.VkPipelineLayout,
+) !vulkan.VkPipeline {
+    var pipeline_create_info = std.mem.zeroes(vulkan.VkGraphicsPipelineCreateInfo);
+    pipeline_create_info.sType = vulkan.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+
+    var rendering_info = std.mem.zeroes(vulkan.VkPipelineRenderingCreateInfo);
+    rendering_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachmentFormats = &dst_format;
+
+    pipeline_create_info.pNext = &rendering_info;
+    pipeline_create_info.stageCount = 2;
+
+    var shader_stage_create_infos = std.mem.zeroes([2]vulkan.VkPipelineShaderStageCreateInfo);
+    // vertex shader:
+    shader_stage_create_infos[0].sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stage_create_infos[0].stage = vulkan.VK_SHADER_STAGE_VERTEX_BIT;
+    shader_stage_create_infos[0].module = vertex_shader;
+    shader_stage_create_infos[0].pName = "main";
+    // fragment shader:
+    shader_stage_create_infos[1].sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stage_create_infos[1].stage = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT;
+    shader_stage_create_infos[1].module = fragment_shader;
+    shader_stage_create_infos[1].pName = "main";
+
+    pipeline_create_info.pStages = &shader_stage_create_infos;
+
+    var vertex_input_info = std.mem.zeroes(vulkan.VkPipelineVertexInputStateCreateInfo);
+    vertex_input_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    pipeline_create_info.pVertexInputState = &vertex_input_info;
+
+    var input_assembly_info = std.mem.zeroes(vulkan.VkPipelineInputAssemblyStateCreateInfo);
+    input_assembly_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    input_assembly_info.topology = vulkan.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    pipeline_create_info.pInputAssemblyState = &input_assembly_info;
+
+    var viewport_info = std.mem.zeroes(vulkan.VkPipelineViewportStateCreateInfo);
+    viewport_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewport_info.viewportCount = 1;
+    viewport_info.scissorCount = 1;
+
+    pipeline_create_info.pViewportState = &viewport_info;
+
+    var rasterization_info = std.mem.zeroes(vulkan.VkPipelineRasterizationStateCreateInfo);
+    rasterization_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterization_info.polygonMode = vulkan.VK_POLYGON_MODE_FILL;
+    rasterization_info.lineWidth = 1.0;
+    rasterization_info.cullMode = vulkan.VK_CULL_MODE_NONE; // parameter?
+    rasterization_info.frontFace = vulkan.VK_FRONT_FACE_COUNTER_CLOCKWISE; // Or CLOCKWISE?
+
+    pipeline_create_info.pRasterizationState = &rasterization_info;
+
+    var multisampling_info = std.mem.zeroes(vulkan.VkPipelineMultisampleStateCreateInfo);
+    multisampling_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling_info.rasterizationSamples = vulkan.VK_SAMPLE_COUNT_1_BIT;
+
+    pipeline_create_info.pMultisampleState = &multisampling_info;
+
+    var color_blend_attachment = std.mem.zeroes(vulkan.VkPipelineColorBlendAttachmentState);
+    color_blend_attachment.colorWriteMask = vulkan.VK_COLOR_COMPONENT_R_BIT | vulkan.VK_COLOR_COMPONENT_G_BIT | vulkan.VK_COLOR_COMPONENT_B_BIT | vulkan.VK_COLOR_COMPONENT_A_BIT;
+    // all blending disabled
+
+    var color_blend_info = std.mem.zeroes(vulkan.VkPipelineColorBlendStateCreateInfo);
+    color_blend_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    color_blend_info.attachmentCount = 1;
+    color_blend_info.pAttachments = &color_blend_attachment;
+
+    pipeline_create_info.pColorBlendState = &color_blend_info;
+
+    const dynamic_states = [2]vulkan.VkDynamicState{ vulkan.VK_DYNAMIC_STATE_VIEWPORT, vulkan.VK_DYNAMIC_STATE_SCISSOR };
+    var dynamic_state_info = std.mem.zeroes(vulkan.VkPipelineDynamicStateCreateInfo);
+    dynamic_state_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamic_state_info.dynamicStateCount = 2;
+    dynamic_state_info.pDynamicStates = &dynamic_states;
+
+    pipeline_create_info.pDynamicState = &dynamic_state_info;
+
+    pipeline_create_info.layout = pipeline_layout;
+
+    var pipeline: vulkan.VkPipeline = undefined;
+    const result = vulkan.vkCreateGraphicsPipelines.?(device, null, 1, &pipeline_create_info, null, &pipeline);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create graphics pipeline: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_graphics_pipeline;
+    }
+
+    return pipeline;
+}

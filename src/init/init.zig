@@ -85,6 +85,8 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     }
     errdefer vulkan.vkDestroyDevice.?(device, null);
 
+    root.shaders.modules = try .init(device);
+
     var surface: vulkan.VkSurfaceKHR = undefined;
     success = sdl.SDL_Vulkan_CreateSurface(window, @ptrCast(instance), null, &surface);
     if (!success) {
@@ -144,6 +146,8 @@ pub export fn quit() void {
     app.swapchain.destroy(app.device);
 
     sdl.SDL_Vulkan_DestroySurface(@ptrCast(app.instance), @ptrCast(app.surface), null);
+
+    root.shaders.modules.destroy(app.device);
 
     vulkan.vkDestroyDevice.?(app.device, null);
 
