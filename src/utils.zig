@@ -3,6 +3,7 @@ const testing = std.testing;
 
 const root = @import("root.zig");
 const vulkan = root.vulkan;
+const shaders = root.shaders;
 
 pub fn create_semaphore(device: vulkan.VkDevice) !vulkan.VkSemaphore {
     const info: vulkan.VkSemaphoreCreateInfo = .{
@@ -383,4 +384,34 @@ pub fn two_stage_graphics_pipeline(
     }
 
     return pipeline;
+}
+
+pub fn create_descriptor_pool(device: vulkan.VkDevice) !vulkan.VkDescriptorPool {
+    var sum: u32 = 0;
+
+    const s1: vulkan.VkDescriptorPoolSize = .{
+        .type = vulkan.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1024,
+    };
+    sum += 1024;
+
+    const sizes = [_]vulkan.VkDescriptorPoolSize{s1};
+
+    const info: vulkan.VkDescriptorPoolCreateInfo = .{
+        .sType = vulkan.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = null,
+        .flags = vulkan.VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .maxSets = sum,
+        .poolSizeCount = sizes.len,
+        .pPoolSizes = &sizes,
+    };
+
+    var pool: vulkan.VkDescriptorPool = undefined;
+    const result = vulkan.vkCreateDescriptorPool.?(device, &info, null, &pool);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create descriptor pool: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_descriptor_pool;
+    }
+
+    return pool;
 }

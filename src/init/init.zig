@@ -112,6 +112,9 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, 1);
     errdefer canvas.destroy(device);
 
+    const descriptor_pool = try utils.create_descriptor_pool(device);
+    errdefer vulkan.vkDestroyDescriptorPool.?(device, descriptor_pool, null);
+
     // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
     // errdefer arena.deinit();
 
@@ -127,6 +130,8 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         .command_pool = command_pool,
         .canvas = canvas,
         .well = try .create(device, command_pool, queue),
+        .descriptor_pool = descriptor_pool,
+        .pipelines = try .create(device, swapchain2.img_format),
     };
 
     return;
@@ -136,6 +141,10 @@ pub export fn quit() void {
     var app = root.pictura_app;
 
     _ = vulkan.vkDeviceWaitIdle.?(app.device);
+
+    app.pipelines.destroy(app.device);
+
+    vulkan.vkDestroyDescriptorPool.?(app.device, app.descriptor_pool, null);
 
     app.well.destroy(app.device);
 

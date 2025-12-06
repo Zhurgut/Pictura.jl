@@ -1,18 +1,16 @@
 const std = @import("std");
 const root = @import("../root.zig");
 const vulkan = root.vulkan;
-const PicturaImage = root.image.PicturaImage;
+const image = root.image;
+const PicturaImage = image.PicturaImage;
 const utils = root.utils;
 const shaders = root.shaders;
 
 pub const Swapchain = struct {
     swapchain: vulkan.VkSwapchainKHR,
     images: [3]PicturaImage,
+    img_format: vulkan.VkFormat,
     semaphores: SemaphoreClub(4),
-    img_copy_descriptor_set_layout: vulkan.VkDescriptorSetLayout,
-    img_copy_pipeline_layout: vulkan.VkPipelineLayout,
-    img_copy_pipeline: vulkan.VkPipeline,
-    // descriptor_sets: [3]vulkan.
 
     pub fn create(
         physical_device: vulkan.VkPhysicalDevice,
@@ -31,7 +29,7 @@ pub const Swapchain = struct {
 
         var count: u32 = 3;
         var images: [3]vulkan.VkImage = undefined;
-        var result = vulkan.vkGetSwapchainImagesKHR.?(device, swapchain, &count, &images);
+        const result = vulkan.vkGetSwapchainImagesKHR.?(device, swapchain, &count, &images);
         if (result != vulkan.VK_SUCCESS and result != vulkan.VK_INCOMPLETE) {
             std.debug.print("failed to get swapchain images: {s}\n", .{vulkan.string_VkResult(result)});
             return error.Vk_failed_to_get_swapchain_images;
@@ -47,62 +45,17 @@ pub const Swapchain = struct {
                 .image = images[i],
                 .layout = vulkan.VK_IMAGE_LAYOUT_UNDEFINED,
                 .image_view = try utils.create_image_view(images[i], device, format),
+                .copy_img_src_descriptor_set = null,
             };
             errdefer {
                 vulkan.vkDestroyImageView.?(device, out.images[i].image_view, null);
             }
         }
 
+        out.img_format = format;
+
         out.semaphores = try SemaphoreClub(4).create(device);
         errdefer out.semaphores.destroy(device);
-
-        const sampler_binding: vulkan.VkDescriptorSetLayoutBinding = .{
-            .binding = 0,
-            .descriptorType = vulkan.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .stageFlags = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = null,
-        };
-
-        const layout_info: vulkan.VkDescriptorSetLayoutCreateInfo = .{
-            .sType = vulkan.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .bindingCount = 1,
-            .pBindings = &sampler_binding,
-        };
-
-        var descriptor_set_layout: vulkan.VkDescriptorSetLayout = undefined;
-        result = vulkan.vkCreateDescriptorSetLayout.?(device, &layout_info, null, &descriptor_set_layout);
-        if (result != vulkan.VK_SUCCESS and result != vulkan.VK_INCOMPLETE) {
-            std.debug.print("failed to create descriptor set layout: {s}\n", .{vulkan.string_VkResult(result)});
-            return error.Vk_failed_to_create_descriptor_set_layout;
-        }
-
-        out.img_copy_descriptor_set_layout = descriptor_set_layout;
-
-        var pipeline_layout_info = std.mem.zeroes(vulkan.VkPipelineLayoutCreateInfo);
-        pipeline_layout_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipeline_layout_info.setLayoutCount = 1;
-        pipeline_layout_info.pSetLayouts = &descriptor_set_layout;
-
-        var pipeline_layout: vulkan.VkPipelineLayout = undefined;
-
-        result = vulkan.vkCreatePipelineLayout.?(device, &pipeline_layout_info, null, &pipeline_layout);
-        if (result != vulkan.VK_SUCCESS and result != vulkan.VK_INCOMPLETE) {
-            std.debug.print("failed to create pipeline layout: {s}\n", .{vulkan.string_VkResult(result)});
-            return error.Vk_failed_to_create_pipeline_layout;
-        }
-
-        out.img_copy_pipeline_layout = pipeline_layout;
-
-        out.img_copy_pipeline = try utils.two_stage_graphics_pipeline(
-            device,
-            format,
-            shaders.modules.fullscreen,
-            shaders.modules.texture_sample,
-            pipeline_layout,
-        );
 
         return out;
     }
@@ -115,13 +68,9 @@ pub const Swapchain = struct {
         }
         swapchain.semaphores.destroy(device);
         vulkan.vkDestroySwapchainKHR.?(device, swapchain.swapchain, null);
-
-        vulkan.vkDestroyPipeline.?(device, swapchain.img_copy_pipeline, null);
-        vulkan.vkDestroyPipelineLayout.?(device, swapchain.img_copy_pipeline_layout, null);
-        vulkan.vkDestroyDescriptorSetLayout.?(device, swapchain.img_copy_descriptor_set_layout, null);
     }
 
-    pub fn present(swapchain: *Swapchain, contents: *PicturaImage, app: *root.PicturaApp) !void {
+    pub fn present(swapchain: *Swapchain, app: *root.PicturaApp) !void {
         _ = try app.well.submit(app.device, app.queue, null, null, null, null); // we dont want all the previous work to wait for image acquired, so submit it right away
 
         var image_acquired: vulkan.VkSemaphore = undefined;
@@ -148,68 +97,27 @@ pub const Swapchain = struct {
 
         swapchain.semaphores.using_image_index(image_index);
 
-        var swapchain_image = swapchain.images[image_index];
+        try image.copy_img(
+            &swapchain.images[image_index],
+            &app.canvas,
+            app.pipelines.swapchain_copy_img_pipeline,
+            app,
+        );
 
-        // const command_buffer = try app.well.render_into(swapchain_image, app.device, app.queue_family_index);
         const command_buffer = try app.well.record(app.device);
 
-        const subresource_layers: vulkan.VkImageSubresourceLayers = .{
-            .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
-            .mipLevel = 0,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        };
-
-        const canvas_barrier = utils.image_memory_barrier(
-            contents,
-            vulkan.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            app.queue_family_index,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            vulkan.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR,
-            vulkan.VK_ACCESS_TRANSFER_READ_BIT,
-        );
-
         var swapchain_barrier = utils.image_memory_barrier(
-            &swapchain_image,
-            vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            app.queue_family_index,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            vulkan.VK_ACCESS_NONE,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR,
-            vulkan.VK_ACCESS_TRANSFER_WRITE_BIT,
-        );
-
-        const barriers = [2]vulkan.VkImageMemoryBarrier2{ swapchain_barrier, canvas_barrier };
-
-        var dep_info: vulkan.VkDependencyInfo = std.mem.zeroes(vulkan.VkDependencyInfo);
-        dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dep_info.imageMemoryBarrierCount = 2;
-        dep_info.pImageMemoryBarriers = &barriers;
-
-        vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
-
-        const copy: vulkan.VkImageCopy = .{
-            .srcSubresource = subresource_layers,
-            .srcOffset = .{ .x = 0, .y = 0, .z = 0 },
-            .dstSubresource = subresource_layers,
-            .dstOffset = .{ .x = 0, .y = 0, .z = 0 },
-            .extent = .{ .width = contents.w, .height = contents.h, .depth = 1 },
-        };
-
-        vulkan.vkCmdCopyImage.?(command_buffer, contents.image, contents.layout, swapchain_image.image, swapchain_image.layout, 1, &copy);
-
-        swapchain_barrier = utils.image_memory_barrier(
-            &swapchain_image,
+            &swapchain.images[image_index],
             vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             app.queue_family_index,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR,
-            vulkan.VK_ACCESS_TRANSFER_WRITE_BIT,
+            vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
             vulkan.VK_PIPELINE_STAGE_2_NONE,
-            vulkan.VK_ACCESS_NONE,
+            // vulkan.VK_ACCESS_2_NONE,
+            0,
         );
 
-        dep_info = std.mem.zeroes(vulkan.VkDependencyInfo);
+        var dep_info = std.mem.zeroes(vulkan.VkDependencyInfo);
         dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
         dep_info.imageMemoryBarrierCount = 1;
         dep_info.pImageMemoryBarriers = &swapchain_barrier;
