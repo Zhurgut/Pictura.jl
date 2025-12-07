@@ -5,6 +5,22 @@ const root = @import("root.zig");
 const vulkan = root.vulkan;
 const utils = root.utils;
 
+pub const Op = enum {
+    none,
+    present,
+    copy_src,
+    copy_dst,
+};
+
+pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipelineStageFlags2, vulkan.VkAccessFlags2 } {
+    return switch (op) {
+        .none => .{ vulkan.VK_IMAGE_LAYOUT_UNDEFINED, vulkan.VK_PIPELINE_STAGE_2_NONE, vulkan.VK_ACCESS_2_NONE },
+        .present => .{ vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, vulkan.VK_PIPELINE_STAGE_2_NONE, vulkan.VK_ACCESS_2_NONE },
+        .copy_src => .{ vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, vulkan.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT },
+        .copy_dst => .{ vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT },
+    };
+}
+
 pub var format: vulkan.VkFormat = undefined; // the standart format for PicturaImages, set during init
 
 pub const PicturaImage = struct {
@@ -12,9 +28,9 @@ pub const PicturaImage = struct {
     h: u32,
     memory: ?vulkan.VkDeviceMemory,
     image: vulkan.VkImage,
-    layout: vulkan.VkImageLayout,
     image_view: vulkan.VkImageView, // we always just need one view, we dont do anything fancy with these
     copy_img_src_descriptor_set: ?vulkan.VkDescriptorSet,
+    last_op: Op,
 
     pub fn create(w: u32, h: u32, device: vulkan.VkDevice, queue_family_index: u32, memory_type_index: u32) !PicturaImage {
         const image = try utils.create_image(device, w, h, queue_family_index, format);
@@ -31,9 +47,9 @@ pub const PicturaImage = struct {
             .h = h,
             .memory = memory,
             .image = image,
-            .layout = vulkan.VK_IMAGE_LAYOUT_UNDEFINED,
             .image_view = image_view,
             .copy_img_src_descriptor_set = null,
+            .last_op = .none,
         };
     }
 
@@ -96,27 +112,11 @@ pub const PicturaImage = struct {
 pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
     var command_buffer = try app.well.record(app.device);
 
-    const src_access = vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | vulkan.VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | vulkan.VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-    const src_stage = vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | vulkan.VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    var src_barrier = utils.get_image_memory_barrier(src, .copy_src, app.queue_family_index);
+    utils.submit_image_memory_barrier(command_buffer, &src_barrier);
 
-    var swapchain_barrier = utils.image_memory_barrier(
-        src,
-        vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        app.queue_family_index,
-        src_stage,
-        src_access,
-        vulkan.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-        vulkan.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-    );
-
-    var dep_info = std.mem.zeroes(vulkan.VkDependencyInfo);
-    dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    dep_info.imageMemoryBarrierCount = 1;
-    dep_info.pImageMemoryBarriers = &swapchain_barrier;
-
-    vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
-
-    command_buffer = try app.well.render_into(dst, app.device, app.queue_family_index);
+    var dst_barrier = utils.get_image_memory_barrier(dst, .copy_dst, app.queue_family_index);
+    command_buffer = try app.well.render_into(dst, &dst_barrier, app.device);
 
     const w = dst.w;
     const h = dst.h;

@@ -43,9 +43,9 @@ pub const Swapchain = struct {
                 .h = h,
                 .memory = null,
                 .image = images[i],
-                .layout = vulkan.VK_IMAGE_LAYOUT_UNDEFINED,
                 .image_view = try utils.create_image_view(images[i], device, format),
                 .copy_img_src_descriptor_set = null,
+                .last_op = .none,
             };
             errdefer {
                 vulkan.vkDestroyImageView.?(device, out.images[i].image_view, null);
@@ -105,24 +105,9 @@ pub const Swapchain = struct {
         );
 
         const command_buffer = try app.well.record(app.device);
+        var swapchain_barrier = utils.get_image_memory_barrier(&swapchain.images[image_index], .present, app.queue_family_index);
 
-        var swapchain_barrier = utils.image_memory_barrier(
-            &swapchain.images[image_index],
-            vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            app.queue_family_index,
-            vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            vulkan.VK_PIPELINE_STAGE_2_NONE,
-            // vulkan.VK_ACCESS_2_NONE,
-            0,
-        );
-
-        var dep_info = std.mem.zeroes(vulkan.VkDependencyInfo);
-        dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dep_info.imageMemoryBarrierCount = 1;
-        dep_info.pImageMemoryBarriers = &swapchain_barrier;
-
-        vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
+        utils.submit_image_memory_barrier(command_buffer, &swapchain_barrier);
 
         var ready_to_present = swapchain.semaphores.get_ready_to_present_semaphore();
 

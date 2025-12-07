@@ -19,6 +19,10 @@ pub const shaders = @import("shaders.zig");
 
 pub var pictura_app: PicturaApp = undefined;
 
+pub fn WellOfCommands() type {
+    return WellOfCommands2(128);
+}
+
 pub const PicturaApp = struct {
     window: ?*sdl.struct_SDL_Window,
     instance: vulkan.VkInstance,
@@ -30,7 +34,7 @@ pub const PicturaApp = struct {
     swapchain: swapchain.Swapchain,
     command_pool: vulkan.VkCommandPool,
     canvas: image.PicturaImage,
-    well: WellOfCommands(128),
+    well: WellOfCommands(),
     descriptor_pool: vulkan.VkDescriptorPool,
     pipelines: Pipelines,
 };
@@ -124,7 +128,7 @@ pub const Pipelines = struct {
 };
 
 // command buffers to cycle through
-pub fn WellOfCommands(comptime n: u32) type {
+fn WellOfCommands2(comptime n: u32) type {
     return struct {
         state: State,
         crt_index: u32,
@@ -138,8 +142,8 @@ pub fn WellOfCommands(comptime n: u32) type {
             recording_rendering,
         };
 
-        pub fn create(device: vulkan.VkDevice, command_pool: vulkan.VkCommandPool, queue: vulkan.VkQueue) !WellOfCommands(n) {
-            var well: WellOfCommands(n) = undefined;
+        pub fn create(device: vulkan.VkDevice, command_pool: vulkan.VkCommandPool, queue: vulkan.VkQueue) !WellOfCommands2(n) {
+            var well: WellOfCommands2(n) = undefined;
             well.state = .ready;
             well.crt_index = 0;
             for (0..n) |i| {
@@ -173,22 +177,22 @@ pub fn WellOfCommands(comptime n: u32) type {
             return well;
         }
 
-        pub fn destroy(well: *WellOfCommands(n), device: vulkan.VkDevice) void {
+        pub fn destroy(well: *WellOfCommands2(n), device: vulkan.VkDevice) void {
             for (0..n) |i| {
                 vulkan.vkDestroySemaphore.?(device, well.semaphores[i], null);
                 vulkan.vkDestroyFence.?(device, well.fences[i], null);
             }
         }
 
-        fn prev(well: *WellOfCommands(n)) u32 {
+        fn prev(well: *WellOfCommands2(n)) u32 {
             return (well.crt_index + n - 1) % n;
         }
 
-        fn next(well: *WellOfCommands(n)) u32 {
+        fn next(well: *WellOfCommands2(n)) u32 {
             return (well.crt_index + 1) % n;
         }
 
-        pub fn record(well: *WellOfCommands(n), device: vulkan.VkDevice) !vulkan.VkCommandBuffer {
+        pub fn record(well: *WellOfCommands2(n), device: vulkan.VkDevice) !vulkan.VkCommandBuffer {
             switch (well.state) {
                 .ready => {
                     try well.begin_cmd_buffer(device);
@@ -201,18 +205,18 @@ pub fn WellOfCommands(comptime n: u32) type {
             return well.command_buffers[well.crt_index];
         }
 
-        pub fn render_into(well: *WellOfCommands(n), pimage: *image.PicturaImage, device: vulkan.VkDevice, queue_family_index: u32) !vulkan.VkCommandBuffer {
+        pub fn render_into(well: *WellOfCommands2(n), pimage: *image.PicturaImage, barrier: *vulkan.VkImageMemoryBarrier2, device: vulkan.VkDevice) !vulkan.VkCommandBuffer {
             switch (well.state) {
                 .ready => {
                     try well.begin_cmd_buffer(device);
-                    try well.begin_rendering(pimage, device, queue_family_index);
+                    try well.begin_rendering(pimage, barrier, device);
                 },
                 .recording => {
-                    try well.begin_rendering(pimage, device, queue_family_index);
+                    try well.begin_rendering(pimage, barrier, device);
                 },
                 .recording_rendering => {
                     well.end_rendering();
-                    try well.begin_rendering(pimage, device, queue_family_index);
+                    try well.begin_rendering(pimage, barrier, device);
                 },
             }
             return well.command_buffers[well.crt_index];
@@ -220,7 +224,7 @@ pub fn WellOfCommands(comptime n: u32) type {
 
         // do not reset fence returned by this!
         pub fn submit(
-            well: *WellOfCommands(n),
+            well: *WellOfCommands2(n),
             device: vulkan.VkDevice,
             queue: vulkan.VkQueue,
             additional_wait: ?vulkan.VkSemaphore,
@@ -302,7 +306,7 @@ pub fn WellOfCommands(comptime n: u32) type {
             well.state = .ready;
         }
 
-        pub fn wait(well: *WellOfCommands(n), device: vulkan.VkDevice, queue: vulkan.VkQueue) !void {
+        pub fn wait(well: *WellOfCommands2(n), device: vulkan.VkDevice, queue: vulkan.VkQueue) !void {
             switch (well.state) {
                 .ready => {},
                 .recording => {
@@ -325,7 +329,7 @@ pub fn WellOfCommands(comptime n: u32) type {
             }
         }
 
-        fn begin_cmd_buffer(well: *WellOfCommands(n), device: vulkan.VkDevice) !void {
+        fn begin_cmd_buffer(well: *WellOfCommands2(n), device: vulkan.VkDevice) !void {
             assert(well.state == .ready);
 
             try utils.wait_and_reset_fence(device, &well.fences[well.crt_index]);
@@ -347,7 +351,7 @@ pub fn WellOfCommands(comptime n: u32) type {
             well.state = .recording;
         }
 
-        fn begin_rendering(well: *WellOfCommands(n), pimage: *image.PicturaImage, device: vulkan.VkDevice, queue_family_index: u32) !void {
+        fn begin_rendering(well: *WellOfCommands2(n), pimage: *image.PicturaImage, barrier: *vulkan.VkImageMemoryBarrier2, device: vulkan.VkDevice) !void {
             if (well.state == .recording_rendering) {
                 well.end_rendering();
             }
@@ -360,34 +364,7 @@ pub fn WellOfCommands(comptime n: u32) type {
 
             const command_buffer = well.command_buffers[well.crt_index];
 
-            const barrier: vulkan.VkImageMemoryBarrier2 = .{
-                .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = null,
-                .srcStageMask = vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                .srcAccessMask = vulkan.VK_ACCESS_2_MEMORY_WRITE_BIT,
-                .dstStageMask = vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dstAccessMask = vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
-                .oldLayout = pimage.layout,
-                .newLayout = vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = queue_family_index,
-                .dstQueueFamilyIndex = queue_family_index,
-                .image = pimage.image,
-                .subresourceRange = .{
-                    .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
-            var dep_info: vulkan.VkDependencyInfo = std.mem.zeroes(vulkan.VkDependencyInfo);
-            dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            dep_info.imageMemoryBarrierCount = 1;
-            dep_info.pImageMemoryBarriers = &barrier;
-
-            vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
-
-            pimage.layout = vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            utils.submit_image_memory_barrier(command_buffer, barrier);
 
             var color_attachment: vulkan.VkRenderingAttachmentInfo = std.mem.zeroes(vulkan.VkRenderingAttachmentInfo);
             color_attachment.sType = vulkan.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -415,7 +392,7 @@ pub fn WellOfCommands(comptime n: u32) type {
             well.state = .recording_rendering;
         }
 
-        fn end_rendering(well: *WellOfCommands(n)) void {
+        fn end_rendering(well: *WellOfCommands2(n)) void {
             assert(well.state == .recording_rendering);
 
             const command_buffer = well.command_buffers[well.crt_index];
@@ -425,7 +402,7 @@ pub fn WellOfCommands(comptime n: u32) type {
             well.state = .recording;
         }
 
-        fn end_cmd_buffer(well: *WellOfCommands(n)) !void {
+        fn end_cmd_buffer(well: *WellOfCommands2(n)) !void {
             if (well.state == .recording_rendering) {
                 well.end_rendering();
             }

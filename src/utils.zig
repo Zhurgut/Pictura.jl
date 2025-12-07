@@ -233,8 +233,38 @@ pub fn wait_and_reset_fence(device: vulkan.VkDevice, pfence: *vulkan.VkFence) !v
     }
 }
 
+pub fn get_image_memory_barrier(image: *root.image.PicturaImage, next_op: root.image.Op, queue_family_index: u32) vulkan.VkImageMemoryBarrier2 {
+    const old_layout, const src_stage, const src_access = root.image.get_access_and_stage(image.last_op);
+    const new_layout, const dst_stage, const dst_access = root.image.get_access_and_stage(next_op);
+
+    const barrier = image_memory_barrier(
+        image,
+        old_layout,
+        new_layout,
+        queue_family_index,
+        src_stage,
+        src_access,
+        dst_stage,
+        dst_access,
+    );
+
+    image.last_op = next_op;
+
+    return barrier;
+}
+
+pub fn submit_image_memory_barrier(command_buffer: vulkan.VkCommandBuffer, barrier: *vulkan.VkImageMemoryBarrier2) void {
+    var dep_info = std.mem.zeroes(vulkan.VkDependencyInfo);
+    dep_info.sType = vulkan.VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep_info.imageMemoryBarrierCount = 1;
+    dep_info.pImageMemoryBarriers = barrier;
+
+    vulkan.vkCmdPipelineBarrier2.?(command_buffer, &dep_info);
+}
+
 pub fn image_memory_barrier(
     image: *root.image.PicturaImage,
+    old_layout: vulkan.VkImageLayout,
     new_layout: vulkan.VkImageLayout,
     queue_family_index: u32,
     src_stage: vulkan.VkPipelineStageFlags2,
@@ -242,7 +272,6 @@ pub fn image_memory_barrier(
     dst_stage: vulkan.VkPipelineStageFlags2,
     dst_access: vulkan.VkAccessFlags2,
 ) vulkan.VkImageMemoryBarrier2 {
-    const old_layout = image.layout;
     const barrier: vulkan.VkImageMemoryBarrier2 = .{
         .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .pNext = null,
@@ -263,7 +292,6 @@ pub fn image_memory_barrier(
             .layerCount = 1,
         },
     };
-    image.layout = new_layout;
 
     return barrier;
 }
