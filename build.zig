@@ -132,7 +132,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
         entry = try walker.next();
     }
 
-    try shaders_zig_out.print("\npub const ShaderModules = struct {{\n", .{});
+    try shaders_zig_out.print(
+        \\pub const ShaderModules = struct {{
+        \\
+    , .{});
 
     walker = try dir.walk(gpa);
 
@@ -145,7 +148,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
         const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
 
-        try shaders_zig_out.print("\t\t{s}: vulkan.VkShaderModule,\n", .{shadername});
+        try shaders_zig_out.print(
+            \\    {s}: vulkan.VkShaderModule,
+            \\
+        , .{shadername});
 
         entry = try walker.next();
     }
@@ -168,7 +174,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
         const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
 
-        try shaders_zig_out.print("\t\t\t.{s} = try utils.create_shader_module(&{s}_spv, device),\n", .{ shadername, shadername });
+        try shaders_zig_out.print(
+            \\            .{s} = try utils.create_shader_module(&{s}_spv, device),
+            \\
+        , .{ shadername, shadername });
 
         entry = try walker.next();
     }
@@ -192,7 +201,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
         const shadername = e.basename[0..std.mem.indexOf(u8, e.basename, ".").?];
 
-        try shaders_zig_out.print("\t\tvulkan.vkDestroyShaderModule.?(device, s.{s}, null);\n", .{shadername});
+        try shaders_zig_out.print(
+            \\        vulkan.vkDestroyShaderModule.?(device, s.{s}, null);
+            \\
+        , .{shadername});
 
         entry = try walker.next();
     }
@@ -202,6 +214,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
         \\}};
         \\
         \\pub var modules: ShaderModules = undefined;
+        \\
     , .{});
 
     try shaders_zig_out.flush();
