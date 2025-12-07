@@ -9,7 +9,7 @@ pub const Op = enum {
     none,
     present,
     copy_src,
-    copy_dst,
+    draw_dst,
 };
 
 pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipelineStageFlags2, vulkan.VkAccessFlags2 } {
@@ -17,7 +17,7 @@ pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipe
         .none => .{ vulkan.VK_IMAGE_LAYOUT_UNDEFINED, vulkan.VK_PIPELINE_STAGE_2_NONE, vulkan.VK_ACCESS_2_NONE },
         .present => .{ vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, vulkan.VK_PIPELINE_STAGE_2_NONE, vulkan.VK_ACCESS_2_NONE },
         .copy_src => .{ vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, vulkan.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT },
-        .copy_dst => .{ vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT },
+        .draw_dst => .{ vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT },
     };
 }
 
@@ -115,7 +115,7 @@ pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipel
     var src_barrier = utils.get_image_memory_barrier(src, .copy_src, app.queue_family_index);
     utils.submit_image_memory_barrier(command_buffer, &src_barrier);
 
-    var dst_barrier = utils.get_image_memory_barrier(dst, .copy_dst, app.queue_family_index);
+    var dst_barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
     command_buffer = try app.well.render_into(dst, &dst_barrier, app.device);
 
     const w = dst.w;
@@ -154,6 +154,36 @@ pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipel
         0,
         null,
     );
+
+    vulkan.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
+}
+
+pub fn draw_background(dst: *PicturaImage, r: f32, g: f32, b: f32, a: f32, app: *root.PicturaApp) !void {
+    const color = [4]f32{ r, g, b, a };
+
+    var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
+    const command_buffer = try app.well.render_into(dst, &barrier, app.device);
+
+    const w = dst.w;
+    const h = dst.h;
+    const viewport: vulkan.VkViewport = .{
+        .x = 0.0,
+        .y = 0.0,
+        .width = @floatFromInt(w),
+        .height = @floatFromInt(h),
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    };
+    const scissor: vulkan.VkRect2D = .{
+        .offset = .{ .x = 0, .y = 0 },
+        .extent = .{ .width = w, .height = h },
+    };
+
+    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
+    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_background_pipeline);
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_background_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, 0, @sizeOf(@TypeOf(color)), &color);
 
     vulkan.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
 }

@@ -46,8 +46,15 @@ pub const Pipelines = struct {
 
     swapchain_copy_img_pipeline: vulkan.VkPipeline,
 
+    draw_background_pipeline_layout: vulkan.VkPipelineLayout,
+    draw_background_pipeline: vulkan.VkPipeline,
+
     pub fn create(device: vulkan.VkDevice, swapchain_img_format: vulkan.VkFormat) !Pipelines {
         var out: Pipelines = undefined;
+
+        //
+        // copy image
+        //
 
         var sampler_create_info = std.mem.zeroes(vulkan.VkSamplerCreateInfo);
         sampler_create_info.sType = vulkan.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -113,8 +120,43 @@ pub const Pipelines = struct {
             shaders.modules.fullscreen,
             shaders.modules.texture_sample,
             pipeline_layout,
+            vulkan.VK_FALSE,
         );
         errdefer vulkan.vkDestroyPipeline.?(device, out.swapchain_copy_img_pipeline, null);
+
+        //
+        // draw background
+        //
+
+        const push_constant_range: vulkan.VkPushConstantRange = .{
+            .stageFlags = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset = 0,
+            .size = 4 * @sizeOf(f32),
+        };
+
+        pipeline_layout_info = std.mem.zeroes(vulkan.VkPipelineLayoutCreateInfo);
+        pipeline_layout_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipeline_layout_info.pushConstantRangeCount = 1;
+        pipeline_layout_info.pPushConstantRanges = &push_constant_range;
+
+        result = vulkan.vkCreatePipelineLayout.?(device, &pipeline_layout_info, null, &pipeline_layout);
+        if (result != vulkan.VK_SUCCESS) {
+            std.debug.print("failed to create pipeline layout: {s}\n", .{vulkan.string_VkResult(result)});
+            return error.Vk_failed_to_create_pipeline_layout;
+        }
+        errdefer vulkan.vkDestroyPipelineLayout.?(device, pipeline_layout, null);
+
+        out.draw_background_pipeline_layout = pipeline_layout;
+
+        out.draw_background_pipeline = try utils.two_stage_graphics_pipeline(
+            device,
+            image.format,
+            shaders.modules.fullscreen,
+            shaders.modules.draw_color,
+            pipeline_layout,
+            vulkan.VK_TRUE,
+        );
+        errdefer vulkan.vkDestroyPipeline.?(device, out.draw_background_pipeline, null);
 
         return out;
     }
@@ -429,10 +471,17 @@ pub export fn PL_init(w: u32, h: u32, hdpi: bool) u32 {
 test "toy example" {
     try init._init(600, 400, false);
 
+    // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
+    // try pictura_app.swapchain.present(&pictura_app);
+
     const start = sdl.SDL_GetTicksNS();
     for (0..100) |_| {
+        // var i: f32 = @floatFromInt(f % 255);
+        // i = i / 255;
+        // try image.draw_background(&pictura_app.canvas, i, i, i, 1.0, &pictura_app);
+        try image.draw_background(&pictura_app.canvas, 0.5, 0.0, 0.0, 1.0, &pictura_app);
         try pictura_app.swapchain.present(&pictura_app);
-        sdl.SDL_Delay(2);
+        sdl.SDL_Delay(20);
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});

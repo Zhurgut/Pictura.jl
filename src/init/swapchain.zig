@@ -260,7 +260,7 @@ fn get_infos(physical_device: vulkan.VkPhysicalDevice, queue_family_index: u32, 
         std.debug.print("{d} {d}\n", .{ formats[i].format, formats[i].colorSpace });
     }
 
-    return .{ capabilities, vulkan.VK_FORMAT_B8G8R8A8_SRGB, formats[0].colorSpace }; // TODO remove hardcoding
+    return .{ capabilities, vulkan.VK_FORMAT_B8G8R8A8_UNORM, formats[0].colorSpace }; // TODO remove hardcoding, need to use unorm format. If no unorm format is available, would need to create the image view with unorm format which is compatible with the chosen srgb format.
 }
 
 pub fn create_swapchain(

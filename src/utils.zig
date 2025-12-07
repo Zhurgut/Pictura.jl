@@ -324,6 +324,7 @@ pub fn two_stage_graphics_pipeline(
     vertex_shader: vulkan.VkShaderModule,
     fragment_shader: vulkan.VkShaderModule,
     pipeline_layout: vulkan.VkPipelineLayout,
+    blend_enable: vulkan.VkBool32,
 ) !vulkan.VkPipeline {
     var pipeline_create_info = std.mem.zeroes(vulkan.VkGraphicsPipelineCreateInfo);
     pipeline_create_info.sType = vulkan.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -383,9 +384,16 @@ pub fn two_stage_graphics_pipeline(
 
     pipeline_create_info.pMultisampleState = &multisampling_info;
 
-    var color_blend_attachment = std.mem.zeroes(vulkan.VkPipelineColorBlendAttachmentState);
-    color_blend_attachment.colorWriteMask = vulkan.VK_COLOR_COMPONENT_R_BIT | vulkan.VK_COLOR_COMPONENT_G_BIT | vulkan.VK_COLOR_COMPONENT_B_BIT | vulkan.VK_COLOR_COMPONENT_A_BIT;
-    // all blending disabled
+    const color_blend_attachment: vulkan.VkPipelineColorBlendAttachmentState = .{
+        .blendEnable = blend_enable,
+        .srcColorBlendFactor = vulkan.VK_BLEND_FACTOR_SRC_ALPHA,
+        .dstColorBlendFactor = vulkan.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .colorBlendOp = vulkan.VK_BLEND_OP_ADD,
+        .srcAlphaBlendFactor = vulkan.VK_BLEND_FACTOR_ONE,
+        .dstAlphaBlendFactor = vulkan.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .alphaBlendOp = vulkan.VK_BLEND_OP_ADD,
+        .colorWriteMask = vulkan.VK_COLOR_COMPONENT_R_BIT | vulkan.VK_COLOR_COMPONENT_G_BIT | vulkan.VK_COLOR_COMPONENT_B_BIT | vulkan.VK_COLOR_COMPONENT_A_BIT,
+    };
 
     var color_blend_info = std.mem.zeroes(vulkan.VkPipelineColorBlendStateCreateInfo);
     color_blend_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
