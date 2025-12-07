@@ -63,17 +63,24 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     }
 
     var pageable_mem_available = false;
+    var swapchain_mutable_format = false;
     for (0..nr_available_exts) |i| {
         const len = std.mem.indexOfSentinel(u8, 0, @ptrCast(&available_dev_exts[i].extensionName));
         if (std.mem.eql(u8, available_dev_exts[i].extensionName[0..len :0], "VK_EXT_pageable_device_local_memory")) {
             std.debug.print("pageable device memory enabled\n", .{});
             pageable_mem_available = true;
-            break;
+        }
+        if (std.mem.eql(u8, available_dev_exts[i].extensionName[0..len :0], "VK_KHR_swapchain_mutable_format")) {
+            swapchain_mutable_format = true;
         }
     }
 
-    const device_extensions = [3][*c]const u8{ "VK_KHR_swapchain", "VK_EXT_pageable_device_local_memory", "VK_EXT_memory_priority" };
-    const nr_device_extensions: u32 = if (pageable_mem_available) 3 else 1;
+    if (!swapchain_mutable_format) {
+        return error.mutable_format_not_available;
+    }
+
+    const device_extensions = [4][*c]const u8{ "VK_KHR_swapchain", "VK_KHR_swapchain_mutable_format", "VK_EXT_pageable_device_local_memory", "VK_EXT_memory_priority" };
+    const nr_device_extensions: u32 = if (pageable_mem_available) 4 else 2;
 
     var device: vulkan.VkDevice = undefined;
     var queue_family_index: u32 = 0;
@@ -131,7 +138,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         .canvas = canvas,
         .well = try .create(device, command_pool, queue),
         .descriptor_pool = descriptor_pool,
-        .pipelines = try .create(device, swapchain2.img_format),
+        .pipelines = try .create(device, swapchain2.view_format),
     };
 
     return;

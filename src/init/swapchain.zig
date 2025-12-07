@@ -10,7 +10,18 @@ pub const Swapchain = struct {
     swapchain: vulkan.VkSwapchainKHR,
     images: [3]PicturaImage,
     img_format: vulkan.VkFormat,
+    view_format: vulkan.VkFormat,
     semaphores: SemaphoreClub(4),
+
+    fn unorm_format(format: vulkan.VkFormat) vulkan.VkFormat {
+        return switch (format) {
+            vulkan.VK_FORMAT_B8G8R8A8_SRGB => vulkan.VK_FORMAT_B8G8R8A8_UNORM,
+            vulkan.VK_FORMAT_R8G8B8A8_SRGB => vulkan.VK_FORMAT_R8G8B8A8_UNORM,
+            vulkan.VK_FORMAT_B8G8R8A8_UNORM => vulkan.VK_FORMAT_B8G8R8A8_UNORM,
+            vulkan.VK_FORMAT_R8G8B8A8_UNORM => vulkan.VK_FORMAT_R8G8B8A8_UNORM,
+            else => unreachable,
+        };
+    }
 
     pub fn create(
         physical_device: vulkan.VkPhysicalDevice,
@@ -37,13 +48,15 @@ pub const Swapchain = struct {
 
         out.swapchain = swapchain;
 
+        out.view_format = Swapchain.unorm_format(format);
+
         for (0..out.images.len) |i| {
             out.images[i] = .{
                 .w = w,
                 .h = h,
                 .memory = null,
                 .image = images[i],
-                .image_view = try utils.create_image_view(images[i], device, format),
+                .image_view = try utils.create_image_view(images[i], device, out.view_format),
                 .copy_img_src_descriptor_set = null,
                 .last_op = .none,
             };
@@ -251,16 +264,29 @@ fn get_infos(physical_device: vulkan.VkPhysicalDevice, queue_family_index: u32, 
     // std.debug.assert(capabilities.supportedUsageFlags & vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT != 0); // for example
 
     var nr_formats: u32 = 0;
-    var formats: [20]vulkan.VkSurfaceFormatKHR = undefined;
+    var formats_buf: [20]vulkan.VkSurfaceFormatKHR = undefined;
 
     result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, null);
     std.debug.assert(20 > nr_formats);
-    result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, &formats);
-    for (0..nr_formats) |i| {
-        std.debug.print("{d} {d}\n", .{ formats[i].format, formats[i].colorSpace });
+    result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, &formats_buf);
+
+    const formats = formats_buf[0..nr_formats];
+    var final_format: ?vulkan.VkFormat = null;
+
+    outer: for ([4]vulkan.VkFormat{ vulkan.VK_FORMAT_B8G8R8A8_SRGB, vulkan.VK_FORMAT_R8G8B8A8_SRGB, vulkan.VK_FORMAT_B8G8R8A8_UNORM, vulkan.VK_FORMAT_R8G8B8A8_UNORM }) |target_format| {
+        for (formats) |available_format| {
+            if (target_format == available_format.format) {
+                final_format = available_format.format;
+                break :outer;
+            }
+        }
     }
 
-    return .{ capabilities, vulkan.VK_FORMAT_B8G8R8A8_UNORM, formats[0].colorSpace }; // TODO remove hardcoding, need to use unorm format. If no unorm format is available, would need to create the image view with unorm format which is compatible with the chosen srgb format.
+    if (final_format == null) {
+        return error.format_not_supported;
+    }
+
+    return .{ capabilities, final_format.?, formats[0].colorSpace };
 }
 
 pub fn create_swapchain(
@@ -272,8 +298,21 @@ pub fn create_swapchain(
     colorspace: vulkan.VkColorSpaceKHR,
     old_swapchain: vulkan.VkSwapchainKHR,
 ) !vulkan.VkSwapchainKHR {
+    const view_format = Swapchain.unorm_format(format);
+
+    const view_formats = [2]vulkan.VkFormat{ format, view_format };
+
+    const view_format_list: vulkan.VkImageFormatListCreateInfo = .{
+        .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO,
+        .pNext = null,
+        .viewFormatCount = 2,
+        .pViewFormats = &view_formats,
+    };
+
     const info: vulkan.VkSwapchainCreateInfoKHR = .{
         .sType = vulkan.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .pNext = &view_format_list,
+        .flags = vulkan.VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR,
         .surface = surface,
         .minImageCount = 3, // TODO not to hardcode this
         .imageFormat = format,

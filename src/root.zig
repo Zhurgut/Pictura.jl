@@ -162,6 +162,8 @@ pub const Pipelines = struct {
     }
 
     pub fn destroy(pipelines: *Pipelines, device: vulkan.VkDevice) void {
+        vulkan.vkDestroyPipeline.?(device, pipelines.draw_background_pipeline, null);
+        vulkan.vkDestroyPipelineLayout.?(device, pipelines.draw_background_pipeline_layout, null);
         vulkan.vkDestroyPipeline.?(device, pipelines.swapchain_copy_img_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.copy_img_pipeline_layout, null);
         vulkan.vkDestroyDescriptorSetLayout.?(device, pipelines.copy_img_src_descriptor_set_layout, null);
@@ -471,17 +473,15 @@ pub export fn PL_init(w: u32, h: u32, hdpi: bool) u32 {
 test "toy example" {
     try init._init(600, 400, false);
 
-    // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
-    // try pictura_app.swapchain.present(&pictura_app);
+    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
+    try pictura_app.swapchain.present(&pictura_app);
 
     const start = sdl.SDL_GetTicksNS();
-    for (0..100) |_| {
-        // var i: f32 = @floatFromInt(f % 255);
-        // i = i / 255;
-        // try image.draw_background(&pictura_app.canvas, i, i, i, 1.0, &pictura_app);
-        try image.draw_background(&pictura_app.canvas, 0.5, 0.0, 0.0, 1.0, &pictura_app);
+    for (0..200) |_| {
+        try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
+        // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
         try pictura_app.swapchain.present(&pictura_app);
-        sdl.SDL_Delay(20);
+        sdl.SDL_Delay(5);
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
