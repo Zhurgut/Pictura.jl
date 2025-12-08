@@ -351,18 +351,9 @@ fn WellOfCommands2(comptime n: u32) type {
         }
 
         pub fn wait(well: *WellOfCommands2(n), device: vulkan.VkDevice, queue: vulkan.VkQueue) !void {
-            switch (well.state) {
-                .ready => {},
-                .recording => {
-                    try well.end_cmd_buffer();
-                    try well.submit(device, queue, null, null, null, null);
-                },
-                .recording_rendering => {
-                    well.end_rendering();
-                    try well.end_cmd_buffer();
-                    try well.submit(device, queue, null, null, null, null);
-                },
-            }
+            try well.submit(device, queue, null, null, null, null);
+
+            assert(well.state == .ready);
 
             // wait for the fence of the last submitted command buffer
             // we must not reset this fence!
@@ -386,6 +377,7 @@ fn WellOfCommands2(comptime n: u32) type {
                 .flags = vulkan.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                 .pInheritanceInfo = null,
             };
+
             const result = vulkan.vkBeginCommandBuffer.?(command_buffer, &info);
             if (result != vulkan.VK_SUCCESS) {
                 std.debug.print("failed to begin command buffer: {s}\n", .{vulkan.string_VkResult(result)});
@@ -471,9 +463,17 @@ pub export fn PL_init(w: u32, h: u32, hdpi: bool) u32 {
 }
 
 test "toy example" {
-    try init._init(600, 400, false);
+    try init._init(800, 600, false);
 
     try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
+    try pictura_app.swapchain.present(&pictura_app);
+
+    try image.draw_background(&pictura_app.canvas, 0.1, 0.5, 0.9, 1.0, &pictura_app);
+
+    const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+
+    // on my pc aabbggrr
+    std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
     try pictura_app.swapchain.present(&pictura_app);
 
     const start = sdl.SDL_GetTicksNS();
@@ -481,7 +481,7 @@ test "toy example" {
         try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
         // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
         try pictura_app.swapchain.present(&pictura_app);
-        sdl.SDL_Delay(5);
+        sdl.SDL_Delay(2);
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});

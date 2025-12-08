@@ -113,7 +113,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var queue: vulkan.VkQueue = undefined;
     vulkan.vkGetDeviceQueue.?(device, queue_family_index, 0, &queue);
 
-    const device_memory_index = utils.get_device_memory_index(physical_device);
+    const device_memory_index = try utils.get_device_memory_index(physical_device);
     std.debug.print("{d}", .{device_memory_index});
 
     var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, 1);

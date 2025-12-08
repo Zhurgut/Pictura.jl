@@ -59,6 +59,9 @@ pub const Swapchain = struct {
                 .image_view = try utils.create_image_view(images[i], device, out.view_format),
                 .copy_img_src_descriptor_set = null,
                 .last_op = .none,
+                .staging_buffer_memory = null,
+                .staging_buffer = null,
+                .pixels = null,
             };
             errdefer {
                 vulkan.vkDestroyImageView.?(device, out.images[i].image_view, null);

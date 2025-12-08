@@ -74,13 +74,56 @@ pub fn create_command_buffer(device: vulkan.VkDevice, command_pool: vulkan.VkCom
     return command_buffer;
 }
 
-pub fn get_device_memory_index(physical_device: vulkan.VkPhysicalDevice) usize {
+pub fn get_device_memory_index(physical_device: vulkan.VkPhysicalDevice) !u32 {
     var properties: vulkan.VkPhysicalDeviceMemoryProperties = undefined;
     vulkan.vkGetPhysicalDeviceMemoryProperties.?(physical_device, &properties);
-    for (properties.memoryTypes[0..properties.memoryTypeCount]) |m| {
-        std.debug.print("{d} heap: {d}\n", .{ m.propertyFlags, m.heapIndex });
+    var heap_index: usize = undefined;
+    for (properties.memoryHeaps[0..properties.memoryHeapCount], 0..) |heap, i| {
+        if (heap.flags == vulkan.VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+            heap_index = i;
+            break;
+        }
     }
-    return 0;
+    var type_index: ?usize = null;
+    for (properties.memoryTypes[0..properties.memoryTypeCount], 0..) |mem_type, i| {
+        if (mem_type.heapIndex == heap_index) {
+            if (mem_type.propertyFlags == vulkan.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+                type_index = i;
+                break;
+            }
+        }
+    }
+    if (type_index) |i| {
+        return @intCast(i);
+    } else {
+        return error.mem_type_not_found;
+    }
+}
+
+pub fn get_RAM_memory_index(physical_device: vulkan.VkPhysicalDevice) !u32 {
+    var properties: vulkan.VkPhysicalDeviceMemoryProperties = undefined;
+    vulkan.vkGetPhysicalDeviceMemoryProperties.?(physical_device, &properties);
+    var heap_index: usize = undefined;
+    for (properties.memoryHeaps[0..properties.memoryHeapCount], 0..) |heap, i| {
+        if (heap.flags == 0) {
+            heap_index = i;
+            break;
+        }
+    }
+    var type_index: ?usize = null;
+    for (properties.memoryTypes[0..properties.memoryTypeCount], 0..) |mem_type, i| {
+        if (mem_type.heapIndex == heap_index) {
+            if (mem_type.propertyFlags == (vulkan.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | vulkan.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+                type_index = i;
+                break;
+            }
+        }
+    }
+    if (type_index) |i| {
+        return @intCast(i);
+    } else {
+        return error.mem_type_not_found;
+    }
 }
 
 pub fn create_image(device: vulkan.VkDevice, w: u32, h: u32, queue_family_index: u32, format: vulkan.VkFormat) !vulkan.VkImage {
