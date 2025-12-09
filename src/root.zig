@@ -58,6 +58,9 @@ pub const PicturaApp = struct {
             try utils.get_device_memory_index(app.physical_device),
         );
         errdefer canvas.destroy(app.device, app.descriptor_pool);
+
+        app.canvas = canvas;
+        app.swapchain = swapchain2;
     }
 };
 
