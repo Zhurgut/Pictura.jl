@@ -19,6 +19,8 @@ pub const Swapchain = struct {
             vulkan.VK_FORMAT_R8G8B8A8_SRGB => vulkan.VK_FORMAT_R8G8B8A8_UNORM,
             vulkan.VK_FORMAT_B8G8R8A8_UNORM => vulkan.VK_FORMAT_B8G8R8A8_UNORM,
             vulkan.VK_FORMAT_R8G8B8A8_UNORM => vulkan.VK_FORMAT_R8G8B8A8_UNORM,
+            vulkan.VK_FORMAT_A8B8G8R8_SRGB_PACK32 => vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
+            vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32 => vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
             else => unreachable,
         };
     }
@@ -276,7 +278,14 @@ fn get_infos(physical_device: vulkan.VkPhysicalDevice, queue_family_index: u32, 
     const formats = formats_buf[0..nr_formats];
     var final_format: ?vulkan.VkFormat = null;
 
-    outer: for ([4]vulkan.VkFormat{ vulkan.VK_FORMAT_B8G8R8A8_SRGB, vulkan.VK_FORMAT_R8G8B8A8_SRGB, vulkan.VK_FORMAT_B8G8R8A8_UNORM, vulkan.VK_FORMAT_R8G8B8A8_UNORM }) |target_format| {
+    outer: for ([4]vulkan.VkFormat{
+        vulkan.VK_FORMAT_B8G8R8A8_SRGB,
+        vulkan.VK_FORMAT_R8G8B8A8_SRGB,
+        vulkan.VK_FORMAT_A8B8G8R8_SRGB_PACK32,
+        vulkan.VK_FORMAT_B8G8R8A8_UNORM,
+        vulkan.VK_FORMAT_R8G8B8A8_UNORM,
+        vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
+    }) |target_format| {
         for (formats) |available_format| {
             if (target_format == available_format.format) {
                 final_format = available_format.format;
