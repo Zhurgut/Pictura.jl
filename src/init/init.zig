@@ -92,7 +92,13 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     }
     errdefer vulkan.vkDestroyDevice.?(device, null);
 
+    var queue: vulkan.VkQueue = undefined;
+    vulkan.vkGetDeviceQueue.?(device, queue_family_index, 0, &queue);
+
     root.shaders.modules = try .init(device);
+
+    const command_pool = try utils.create_command_pool(device, queue_family_index);
+    errdefer vulkan.vkDestroyCommandPool.?(device, command_pool, null);
 
     var surface: vulkan.VkSurfaceKHR = undefined;
     success = sdl.SDL_Vulkan_CreateSurface(window, @ptrCast(instance), null, &surface);
@@ -104,23 +110,19 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
 
     image.format = vulkan.VK_FORMAT_R8G8B8A8_UNORM;
 
+    const descriptor_pool = try utils.create_descriptor_pool(device);
+    errdefer vulkan.vkDestroyDescriptorPool.?(device, descriptor_pool, null);
+
+    const well: root.WellOfCommands = try .create(device, command_pool, queue);
+
     var swapchain2 = try swapchain.Swapchain.create(physical_device, device, queue_family_index, surface, w, h);
     errdefer swapchain2.destroy(device);
 
-    const command_pool = try utils.create_command_pool(device, queue_family_index);
-    errdefer vulkan.vkDestroyCommandPool.?(device, command_pool, null);
+    const pipelines = try root.Pipelines.create(device, swapchain2.view_format);
 
-    var queue: vulkan.VkQueue = undefined;
-    vulkan.vkGetDeviceQueue.?(device, queue_family_index, 0, &queue);
-
-    const device_memory_index = try utils.get_device_memory_index(physical_device);
-    std.debug.print("{d}", .{device_memory_index});
-
-    var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, 1);
+    const dev_mem = try utils.get_device_memory_index(physical_device);
+    var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, dev_mem);
     errdefer canvas.destroy(device);
-
-    const descriptor_pool = try utils.create_descriptor_pool(device);
-    errdefer vulkan.vkDestroyDescriptorPool.?(device, descriptor_pool, null);
 
     // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
     // errdefer arena.deinit();
@@ -136,9 +138,9 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         .swapchain = swapchain2,
         .command_pool = command_pool,
         .canvas = canvas,
-        .well = try .create(device, command_pool, queue),
+        .well = well,
         .descriptor_pool = descriptor_pool,
-        .pipelines = try .create(device, swapchain2.view_format),
+        .pipelines = pipelines,
     };
 
     return;
@@ -149,19 +151,19 @@ pub export fn quit() void {
 
     _ = vulkan.vkDeviceWaitIdle.?(app.device);
 
-    app.pipelines.destroy(app.device);
-
-    vulkan.vkDestroyDescriptorPool.?(app.device, app.descriptor_pool, null);
-
-    app.well.destroy(app.device);
-
-    app.canvas.destroy(app.device);
-
-    vulkan.vkDestroyCommandPool.?(app.device, app.command_pool, null);
+    app.canvas.destroy(app.device, app.descriptor_pool);
 
     app.swapchain.destroy(app.device);
 
+    app.pipelines.destroy(app.device);
+
+    app.well.destroy(app.device);
+
+    vulkan.vkDestroyDescriptorPool.?(app.device, app.descriptor_pool, null);
+
     sdl.SDL_Vulkan_DestroySurface(@ptrCast(app.instance), @ptrCast(app.surface), null);
+
+    vulkan.vkDestroyCommandPool.?(app.device, app.command_pool, null);
 
     root.shaders.modules.destroy(app.device);
 

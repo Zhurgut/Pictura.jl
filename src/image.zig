@@ -160,7 +160,7 @@ pub const PicturaImage = struct {
         return .{ memory, buffer };
     }
 
-    pub fn destroy(pimage: *PicturaImage, device: vulkan.VkDevice) void {
+    pub fn destroy(pimage: *PicturaImage, device: vulkan.VkDevice, descriptor_pool: vulkan.VkDescriptorPool) void {
         if (pimage.staging_buffer_memory) |mem| {
             pimage.pixels = null;
             vulkan.vkUnmapMemory.?(device, mem);
@@ -169,6 +169,20 @@ pub const PicturaImage = struct {
         if (pimage.staging_buffer) |buf| {
             vulkan.vkDestroyBuffer.?(device, buf, null);
         }
+
+        if (pimage.copy_img_src_descriptor_set) |ds| {
+            const result = vulkan.vkFreeDescriptorSets.?(device, descriptor_pool, 1, &ds);
+
+            if (result != vulkan.VK_SUCCESS) {
+                std.debug.print("failed to free descriptorset: {s}\n", .{vulkan.string_VkResult(result)});
+                // dont return an error here, this should never happen
+            }
+        }
+
+        pimage.pixels = null;
+        pimage.staging_buffer_memory = null;
+        pimage.staging_buffer = null;
+        pimage.copy_img_src_descriptor_set = null;
 
         vulkan.vkDestroyImageView.?(device, pimage.image_view, null);
         if (pimage.memory) |mem| {
