@@ -19,9 +19,7 @@ pub const shaders = @import("shaders.zig");
 
 pub var pictura_app: PicturaApp = undefined;
 
-pub fn WellOfCommands() type {
-    return WellOfCommands2(128);
-}
+pub const WellOfCommands = WellOfCommands2(128);
 
 pub const PicturaApp = struct {
     window: ?*sdl.struct_SDL_Window,
@@ -34,9 +32,33 @@ pub const PicturaApp = struct {
     swapchain: swapchain.Swapchain,
     command_pool: vulkan.VkCommandPool,
     canvas: image.PicturaImage,
-    well: WellOfCommands(),
+    well: WellOfCommands,
     descriptor_pool: vulkan.VkDescriptorPool,
     pipelines: Pipelines,
+
+    pub fn resize(app: *PicturaApp, w: u32, h: u32) !void {
+        app.canvas.destroy(app.device);
+        app.swapchain.destroy(app.device);
+
+        var swapchain2 = try swapchain.Swapchain.create(
+            app.physical_device,
+            app.device,
+            app.queue_family_index,
+            app.surface,
+            w,
+            h,
+        );
+        errdefer swapchain2.destroy(app.device);
+
+        var canvas = try image.PicturaImage.create(
+            w,
+            h,
+            app.device,
+            app.queue_family_index,
+            try utils.get_device_memory_index(app.physical_device),
+        );
+        errdefer canvas.destroy(app.device, app.descriptor_pool);
+    }
 };
 
 pub const Pipelines = struct {
