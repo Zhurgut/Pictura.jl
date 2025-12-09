@@ -14,7 +14,7 @@ pub const vulkan = @cImport({
 pub const init = @import("init/init.zig");
 pub const image = @import("image.zig");
 pub const utils = @import("utils.zig");
-pub const swapchain = @import("init/swapchain.zig");
+pub const swapchain = @import("swapchain.zig");
 pub const shaders = @import("shaders.zig");
 
 pub var pictura_app: PicturaApp = undefined;
