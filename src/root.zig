@@ -16,6 +16,7 @@ pub const image = @import("image.zig");
 pub const utils = @import("utils.zig");
 pub const swapchain = @import("swapchain.zig");
 pub const shaders = @import("shaders.zig");
+pub const events = @import("events.zig");
 
 pub var pictura_app: PicturaApp = undefined;
 
@@ -35,9 +36,11 @@ pub const PicturaApp = struct {
     well: WellOfCommands,
     descriptor_pool: vulkan.VkDescriptorPool,
     pipelines: Pipelines,
+    running: bool,
+    event_handler: events.EventHandler,
 
     pub fn resize(app: *PicturaApp, w: u32, h: u32) !void {
-        app.canvas.destroy(app.device);
+        app.canvas.destroy(app.device, app.descriptor_pool);
         app.swapchain.destroy(app.device);
 
         var swapchain2 = try swapchain.Swapchain.create(
@@ -502,11 +505,14 @@ test "toy example" {
     try pictura_app.swapchain.present(&pictura_app);
 
     const start = sdl.SDL_GetTicksNS();
-    for (0..200) |_| {
-        try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
-        // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
-        try pictura_app.swapchain.present(&pictura_app);
-        sdl.SDL_Delay(2);
+    for (0..1000) |_| {
+        if (pictura_app.running) {
+            try pictura_app.event_handler.handle_events(&pictura_app);
+            try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
+            // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
+            try pictura_app.swapchain.present(&pictura_app);
+            sdl.SDL_Delay(5);
+        }
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});

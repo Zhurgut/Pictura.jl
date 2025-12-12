@@ -1,5 +1,5 @@
 const std = @import("std");
-const root = @import("../root.zig");
+const root = @import("root.zig");
 const vulkan = root.vulkan;
 const image = root.image;
 const PicturaImage = image.PicturaImage;
@@ -95,7 +95,7 @@ pub const Swapchain = struct {
         const ready = try swapchain.semaphores.if_ready_get_image_acquired_semaphore(app.device, &image_acquired);
 
         if (!ready) {
-            std.debug.print("-", .{});
+            // std.debug.print("-", .{});
             return;
         }
 
@@ -105,11 +105,11 @@ pub const Swapchain = struct {
         std.debug.assert(acquire_image_success != vulkan.VK_SUBOPTIMAL_KHR);
 
         if (acquire_image_success == vulkan.VK_NOT_READY) {
-            std.debug.print("-", .{});
+            // std.debug.print("-", .{});
             return;
         }
 
-        std.debug.print("*", .{});
+        // std.debug.print("*", .{});
 
         // otherwise, we are presenting!
 
@@ -278,7 +278,7 @@ fn get_infos(physical_device: vulkan.VkPhysicalDevice, queue_family_index: u32, 
     const formats = formats_buf[0..nr_formats];
     var final_format: ?vulkan.VkFormat = null;
 
-    outer: for ([4]vulkan.VkFormat{
+    outer: for ([6]vulkan.VkFormat{
         vulkan.VK_FORMAT_B8G8R8A8_SRGB,
         vulkan.VK_FORMAT_R8G8B8A8_SRGB,
         vulkan.VK_FORMAT_A8B8G8R8_SRGB_PACK32,

@@ -141,6 +141,8 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         .well = well,
         .descriptor_pool = descriptor_pool,
         .pipelines = pipelines,
+        .running = true,
+        .event_handler = .create(),
     };
 
     return;
