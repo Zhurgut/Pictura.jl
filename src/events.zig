@@ -110,7 +110,9 @@ pub const EventHandler = struct {
                     const w = event.window.data1;
                     const h = event.window.data2;
 
-                    try app.resize(@intCast(w), @intCast(h));
+                    if (app.canvas.w != w or app.canvas.h != h) {
+                        try app.resize(@intCast(w), @intCast(h));
+                    }
                 },
                 sdl.SDL_EVENT_WINDOW_MOVED => {
                     const x = event.window.data1;

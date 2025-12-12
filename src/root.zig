@@ -40,6 +40,19 @@ pub const PicturaApp = struct {
     event_handler: events.EventHandler,
 
     pub fn resize(app: *PicturaApp, w: u32, h: u32) !void {
+        var new_canvas = try image.PicturaImage.create(
+            w,
+            h,
+            app.device,
+            app.queue_family_index,
+            try utils.get_device_memory_index(app.physical_device),
+        );
+        errdefer new_canvas.destroy(app.device, app.descriptor_pool);
+
+        try image.copy_img(&new_canvas, &app.canvas, app.pipelines.copy_img_pipeline, app);
+
+        try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
+
         app.canvas.destroy(app.device, app.descriptor_pool);
         app.swapchain.destroy(app.device);
 
@@ -53,16 +66,7 @@ pub const PicturaApp = struct {
         );
         errdefer swapchain2.destroy(app.device);
 
-        var canvas = try image.PicturaImage.create(
-            w,
-            h,
-            app.device,
-            app.queue_family_index,
-            try utils.get_device_memory_index(app.physical_device),
-        );
-        errdefer canvas.destroy(app.device, app.descriptor_pool);
-
-        app.canvas = canvas;
+        app.canvas = new_canvas;
         app.swapchain = swapchain2;
     }
 };
@@ -73,6 +77,7 @@ pub const Pipelines = struct {
     copy_img_pipeline_layout: vulkan.VkPipelineLayout,
 
     swapchain_copy_img_pipeline: vulkan.VkPipeline,
+    copy_img_pipeline: vulkan.VkPipeline,
 
     draw_background_pipeline_layout: vulkan.VkPipelineLayout,
     draw_background_pipeline: vulkan.VkPipeline,
@@ -152,6 +157,16 @@ pub const Pipelines = struct {
         );
         errdefer vulkan.vkDestroyPipeline.?(device, out.swapchain_copy_img_pipeline, null);
 
+        out.copy_img_pipeline = try utils.two_stage_graphics_pipeline(
+            device,
+            image.format,
+            shaders.modules.fullscreen,
+            shaders.modules.texture_sample,
+            pipeline_layout,
+            vulkan.VK_FALSE,
+        );
+        errdefer vulkan.vkDestroyPipeline.?(device, out.copy_img_pipeline, null);
+
         //
         // draw background
         //
@@ -193,6 +208,7 @@ pub const Pipelines = struct {
         vulkan.vkDestroyPipeline.?(device, pipelines.draw_background_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.draw_background_pipeline_layout, null);
         vulkan.vkDestroyPipeline.?(device, pipelines.swapchain_copy_img_pipeline, null);
+        vulkan.vkDestroyPipeline.?(device, pipelines.copy_img_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.copy_img_pipeline_layout, null);
         vulkan.vkDestroyDescriptorSetLayout.?(device, pipelines.copy_img_src_descriptor_set_layout, null);
         vulkan.vkDestroySampler.?(device, pipelines.copy_img_src_sampler, null);
@@ -484,39 +500,69 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-pub export fn PL_init(w: u32, h: u32, hdpi: bool) u32 {
-    init._init(w, h, hdpi) catch |e| return @intFromError(e);
+test "preserve contents" {
+    const w = 800;
+    const h = 600;
+    try init._init(w, h, false);
 
-    return 0;
-}
+    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 1.0, 1.0, &pictura_app);
 
-test "toy example" {
-    try init._init(800, 600, false);
-
-    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
-    try pictura_app.swapchain.present(&pictura_app);
-
-    try image.draw_background(&pictura_app.canvas, 0.1, 0.5, 0.9, 1.0, &pictura_app);
-
-    const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
-
-    // on my pc aabbggrr
-    std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
-    try pictura_app.swapchain.present(&pictura_app);
-
-    const start = sdl.SDL_GetTicksNS();
-    for (0..1000) |_| {
+    for (0..500) |i| {
+        std.debug.print("{d}: ", .{i});
         if (pictura_app.running) {
             try pictura_app.event_handler.handle_events(&pictura_app);
-            try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
-            // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
             try pictura_app.swapchain.present(&pictura_app);
-            sdl.SDL_Delay(5);
+            sdl.SDL_Delay(9);
         }
     }
-    const stop = sdl.SDL_GetTicksNS();
-    std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
-    try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
 
     init.quit();
 }
+
+// test "toy example" {
+//     const w = 800;
+//     const h = 600;
+//     try init._init(w, h, false);
+
+//     try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
+//     try pictura_app.swapchain.present(&pictura_app);
+
+//     try image.draw_background(&pictura_app.canvas, 0.1, 0.5, 0.9, 1.0, &pictura_app);
+
+//     // const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+
+//     // on my pc aabbggrr
+//     // std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
+
+//     // for (0..w * h) |i| {
+//     // const d: u32 = @as(u32, @intCast(i)) % 255;
+//     // const c: u32 = std.math.clamp(d, 0, 255);
+//     // pixels[i] = c | (c << 8) | (c << 16);
+//     // pixels[i] = 0xaaaaaaaa;
+//     // }
+
+//     // try image.update_pixels(&pictura_app.canvas, &pictura_app);
+
+//     // _ = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+
+//     // on my pc aabbggrr
+//     // std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
+
+//     try pictura_app.swapchain.present(&pictura_app);
+
+//     const start = sdl.SDL_GetTicksNS();
+//     for (0..1000) |_| {
+//         if (pictura_app.running) {
+//             try pictura_app.event_handler.handle_events(&pictura_app);
+//             // try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.007, &pictura_app);
+//             try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
+//             try pictura_app.swapchain.present(&pictura_app);
+//             sdl.SDL_Delay(5);
+//         }
+//     }
+//     const stop = sdl.SDL_GetTicksNS();
+//     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
+//     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
+
+//     init.quit();
+// }
