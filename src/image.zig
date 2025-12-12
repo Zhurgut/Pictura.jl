@@ -11,6 +11,7 @@ pub const Op = enum {
     copy_src,
     draw_dst,
     load_pixels,
+    update_pixels,
 };
 
 pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipelineStageFlags2, vulkan.VkAccessFlags2 } {
@@ -20,6 +21,7 @@ pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipe
         .copy_src => .{ vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, vulkan.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT },
         .draw_dst => .{ vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT },
         .load_pixels => .{ vulkan.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT, vulkan.VK_ACCESS_TRANSFER_READ_BIT },
+        .update_pixels => .{ vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT, vulkan.VK_ACCESS_TRANSFER_WRITE_BIT },
     };
 }
 
@@ -162,7 +164,6 @@ pub const PicturaImage = struct {
 
     pub fn destroy(pimage: *PicturaImage, device: vulkan.VkDevice, descriptor_pool: vulkan.VkDescriptorPool) void {
         if (pimage.staging_buffer_memory) |mem| {
-            pimage.pixels = null;
             vulkan.vkUnmapMemory.?(device, mem);
             vulkan.vkFreeMemory.?(device, mem, null);
         }
@@ -175,7 +176,7 @@ pub const PicturaImage = struct {
 
             if (result != vulkan.VK_SUCCESS) {
                 std.debug.print("failed to free descriptorset: {s}\n", .{vulkan.string_VkResult(result)});
-                // dont return an error here, this should never happen
+                // dont return an error here, this should never happen, fingers crossed
             }
         }
 
@@ -323,4 +324,43 @@ pub fn load_pixels(pimage: *PicturaImage, app: *root.PicturaApp) ![*]u32 {
     }
 
     return pimage.pixels.?;
+}
+
+pub fn update_pixels(pimage: *PicturaImage, app: *root.PicturaApp) !void {
+    if (pimage.staging_buffer == null) {
+        return; // need to call loadpixels first, otherwise no data to load into texture
+    }
+
+    const command_buffer = try app.well.record(app.device);
+
+    var barrier = utils.get_image_memory_barrier(pimage, .update_pixels, app.queue_family_index);
+    utils.submit_image_memory_barrier(command_buffer, &barrier);
+
+    const staging_buffer = pimage.staging_buffer.?;
+
+    var region = std.mem.zeroes(vulkan.VkBufferImageCopy2);
+    region.sType = vulkan.VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
+    region.imageSubresource = .{
+        .aspectMask = vulkan.VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = 0,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    };
+    region.imageExtent = .{
+        .width = pimage.w,
+        .height = pimage.h,
+        .depth = 1,
+    };
+
+    const copy_info: vulkan.VkCopyBufferToImageInfo2 = .{
+        .sType = vulkan.VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+        .pNext = null,
+        .srcBuffer = staging_buffer,
+        .dstImage = pimage.image,
+        .dstImageLayout = vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = 1,
+        .pRegions = &region,
+    };
+
+    vulkan.vkCmdCopyBufferToImage2.?(command_buffer, &copy_info);
 }

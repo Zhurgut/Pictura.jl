@@ -500,69 +500,80 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-test "preserve contents" {
-    const w = 800;
-    const h = 600;
+test "udpate pixels" {
+    const w = 297;
+    const h = 199;
     try init._init(w, h, false);
 
-    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 1.0, 1.0, &pictura_app);
+    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
 
-    for (0..500) |i| {
-        std.debug.print("{d}: ", .{i});
+    const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+
+    for (0..w * h) |i| {
+        var d: u32 = 0;
+        for (2..@max(2, i >> 1)) |k| {
+            if (i % k == 0) {
+                d += 5;
+            }
+        }
+        // const d: u32 = @as(u32, @intCast(i)) % 255;
+        const c: u32 = std.math.clamp(d, 0, 255);
+        pixels[i] = c | (c << 8) | (c << 16);
+    }
+
+    try image.update_pixels(&pictura_app.canvas, &pictura_app);
+
+    try pictura_app.swapchain.present(&pictura_app);
+
+    for (0..1000) |_| {
         if (pictura_app.running) {
             try pictura_app.event_handler.handle_events(&pictura_app);
             try pictura_app.swapchain.present(&pictura_app);
-            sdl.SDL_Delay(9);
+            sdl.SDL_Delay(5);
         }
     }
 
     init.quit();
 }
 
-// test "toy example" {
-//     const w = 800;
-//     const h = 600;
-//     try init._init(w, h, false);
+test "toy example" {
+    const w = 800;
+    const h = 600;
+    try init._init(w, h, false);
 
-//     try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
-//     try pictura_app.swapchain.present(&pictura_app);
+    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
+    try pictura_app.swapchain.present(&pictura_app);
 
-//     try image.draw_background(&pictura_app.canvas, 0.1, 0.5, 0.9, 1.0, &pictura_app);
+    try image.draw_background(&pictura_app.canvas, 0.1, 0.5, 0.9, 1.0, &pictura_app);
 
-//     // const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+    const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
 
-//     // on my pc aabbggrr
-//     // std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
+    // on my pc aabbggrr
+    std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
 
-//     // for (0..w * h) |i| {
-//     // const d: u32 = @as(u32, @intCast(i)) % 255;
-//     // const c: u32 = std.math.clamp(d, 0, 255);
-//     // pixels[i] = c | (c << 8) | (c << 16);
-//     // pixels[i] = 0xaaaaaaaa;
-//     // }
+    for (0..w * h) |i| {
+        const d: u32 = @as(u32, @intCast(i)) % 255;
+        const c: u32 = std.math.clamp(d, 0, 255);
+        pixels[i] = c | (c << 8) | (c << 16);
+    }
 
-//     // try image.update_pixels(&pictura_app.canvas, &pictura_app);
+    try image.update_pixels(&pictura_app.canvas, &pictura_app);
 
-//     // _ = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+    try pictura_app.swapchain.present(&pictura_app);
 
-//     // on my pc aabbggrr
-//     // std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
+    const start = sdl.SDL_GetTicksNS();
+    for (0..1000) |_| {
+        if (pictura_app.running) {
+            try pictura_app.event_handler.handle_events(&pictura_app);
+            try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
+            // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
+            try pictura_app.swapchain.present(&pictura_app);
+            sdl.SDL_Delay(8);
+        }
+    }
+    const stop = sdl.SDL_GetTicksNS();
+    std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
+    try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
 
-//     try pictura_app.swapchain.present(&pictura_app);
-
-//     const start = sdl.SDL_GetTicksNS();
-//     for (0..1000) |_| {
-//         if (pictura_app.running) {
-//             try pictura_app.event_handler.handle_events(&pictura_app);
-//             // try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.007, &pictura_app);
-//             try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
-//             try pictura_app.swapchain.present(&pictura_app);
-//             sdl.SDL_Delay(5);
-//         }
-//     }
-//     const stop = sdl.SDL_GetTicksNS();
-//     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
-//     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
-
-//     init.quit();
-// }
+    init.quit();
+}
