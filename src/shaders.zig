@@ -5,6 +5,7 @@ const utils = root.utils;
 const draw_color_spv align(64) = @embedFile(".spirv/draw_color.spv").*;
 const texture_sample_spv align(64) = @embedFile(".spirv/texture_sample.spv").*;
 const fullscreen_spv align(64) = @embedFile(".spirv/fullscreen.spv").*;
+
 pub const ShaderModules = struct {
     draw_color: vulkan.VkShaderModule,
     texture_sample: vulkan.VkShaderModule,

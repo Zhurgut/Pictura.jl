@@ -133,6 +133,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
     }
 
     try shaders_zig_out.print(
+        \\
         \\pub const ShaderModules = struct {{
         \\
     , .{});
