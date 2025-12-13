@@ -105,14 +105,13 @@ pub const EventHandler = struct {
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED, sdl.SDL_EVENT_WINDOW_DESTROYED, sdl.SDL_EVENT_QUIT => {
                     app.running = false;
                 },
-                sdl.SDL_EVENT_WINDOW_MAXIMIZED => {},
                 sdl.SDL_EVENT_WINDOW_RESIZED, sdl.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => {
                     const w = event.window.data1;
                     const h = event.window.data2;
 
-                    if (app.canvas.w != w or app.canvas.h != h) {
-                        try app.resize(@intCast(w), @intCast(h));
-                    }
+                    std.debug.print("size changed {d} {d}\n", .{ w, h });
+
+                    try app.resize(@intCast(w), @intCast(h));
                 },
                 sdl.SDL_EVENT_WINDOW_MOVED => {
                     const x = event.window.data1;

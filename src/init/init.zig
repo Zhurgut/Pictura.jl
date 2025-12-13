@@ -23,7 +23,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
 
     const hdpi_flag: u32 = if (hdpi) sdl.SDL_WINDOW_HIGH_PIXEL_DENSITY else 0;
 
-    const window = sdl.SDL_CreateWindow(
+    const window: ?*sdl.SDL_Window = sdl.SDL_CreateWindow(
         "Pictura",
         @intCast(w),
         @intCast(h),
@@ -33,7 +33,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         print_error();
         return error.SDL_CreateWindowError;
     }
-    errdefer sdl.SDL_DestroyWindow(window);
+    errdefer sdl.SDL_DestroyWindow(window.?);
 
     var nr_extensions: u32 = 0;
     const vk_extensions = sdl.SDL_Vulkan_GetInstanceExtensions(&nr_extensions);
@@ -101,7 +101,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     errdefer vulkan.vkDestroyCommandPool.?(device, command_pool, null);
 
     var surface: vulkan.VkSurfaceKHR = undefined;
-    success = sdl.SDL_Vulkan_CreateSurface(window, @ptrCast(instance), null, &surface);
+    success = sdl.SDL_Vulkan_CreateSurface(window.?, @ptrCast(instance), null, &surface);
     if (!success) {
         print_error();
         return error.SDL_VulkanCreateSurfaceError;
@@ -128,7 +128,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     // errdefer arena.deinit();
 
     root.pictura_app = .{
-        .window = window,
+        .window = window.?,
         .instance = instance,
         .physical_device = physical_device,
         .device = device,

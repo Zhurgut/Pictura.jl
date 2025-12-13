@@ -17,13 +17,14 @@ pub const utils = @import("utils.zig");
 pub const swapchain = @import("swapchain.zig");
 pub const shaders = @import("shaders.zig");
 pub const events = @import("events.zig");
+pub const sdl_utils = @import("sdl_utils.zig");
 
 pub var pictura_app: PicturaApp = undefined;
 
 pub const WellOfCommands = WellOfCommands2(128);
 
 pub const PicturaApp = struct {
-    window: ?*sdl.struct_SDL_Window,
+    window: *sdl.SDL_Window,
     instance: vulkan.VkInstance,
     physical_device: vulkan.VkPhysicalDevice,
     device: vulkan.VkDevice,
@@ -40,6 +41,10 @@ pub const PicturaApp = struct {
     event_handler: events.EventHandler,
 
     pub fn resize(app: *PicturaApp, w: u32, h: u32) !void {
+        if (app.canvas.w == w and app.canvas.h == h) {
+            return;
+        }
+
         var new_canvas = try image.PicturaImage.create(
             w,
             h,
@@ -500,43 +505,9 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-test "udpate pixels" {
-    const w = 297;
-    const h = 199;
-    try init._init(w, h, false);
-
-    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
-
-    const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
-
-    for (0..w * h) |i| {
-        var d: u32 = 0;
-        for (2..@max(2, i >> 1)) |k| {
-            if (i % k == 0) {
-                d += 5;
-            }
-        }
-        // const d: u32 = @as(u32, @intCast(i)) % 255;
-        const c: u32 = std.math.clamp(d, 0, 255);
-        pixels[i] = c | (c << 8) | (c << 16);
-    }
-
-    try image.update_pixels(&pictura_app.canvas, &pictura_app);
-
-    try pictura_app.swapchain.present(&pictura_app);
-
-    for (0..1000) |_| {
-        if (pictura_app.running) {
-            try pictura_app.event_handler.handle_events(&pictura_app);
-            try pictura_app.swapchain.present(&pictura_app);
-            sdl.SDL_Delay(5);
-        }
-    }
-
-    init.quit();
-}
-
 test "toy example" {
+    _ = @import("sdl_utils.zig");
+
     const w = 800;
     const h = 600;
     try init._init(w, h, false);
