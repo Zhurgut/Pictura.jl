@@ -118,7 +118,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var swapchain2 = try swapchain.Swapchain.create(physical_device, device, queue_family_index, surface, w, h);
     errdefer swapchain2.destroy(device);
 
-    const pipelines = try root.Pipelines.create(device, swapchain2.view_format);
+    const pipelines = try root.pipelines.Pipelines.create(device, swapchain2.view_format);
 
     const dev_mem = try utils.get_device_memory_index(physical_device);
     var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, dev_mem);

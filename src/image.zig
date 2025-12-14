@@ -67,7 +67,7 @@ pub const PicturaImage = struct {
         pimage: *PicturaImage,
         device: vulkan.VkDevice,
         d_pool: vulkan.VkDescriptorPool,
-        pipelines: *root.Pipelines,
+        pipelines: *root.pipelines.Pipelines,
     ) !vulkan.VkDescriptorSet {
         if (pimage.copy_img_src_descriptor_set) |set| {
             return set;
