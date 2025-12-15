@@ -19,10 +19,10 @@ void main() {
         pc.tr, pc.bl, pc.br 
     );
 
-    vec2 tl = pc.tl * pc.two_over_dims - 1 ;
-    vec2 tr = pc.tr * pc.two_over_dims - 1 ;
-    vec2 bl = pc.bl * pc.two_over_dims - 1 ;
-    vec2 br = pc.br * pc.two_over_dims - 1 ;
+    vec2 tl = pc.tl * pc.two_over_dims - 1;
+    vec2 tr = pc.tr * pc.two_over_dims - 1;
+    vec2 bl = pc.bl * pc.two_over_dims - 1;
+    vec2 br = pc.br * pc.two_over_dims - 1;
 
     const vec2 corners[6] = vec2[] (
         tl, bl, tr,
