@@ -5,6 +5,8 @@ const root = @import("root.zig");
 const vulkan = root.vulkan;
 const utils = root.utils;
 
+pub var format: vulkan.VkFormat = vulkan.VK_FORMAT_R8G8B8A8_UNORM; // the standart format for PicturaImages
+
 pub const Op = enum {
     none,
     present,
@@ -24,8 +26,6 @@ pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipe
         .update_pixels => .{ vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT, vulkan.VK_ACCESS_TRANSFER_WRITE_BIT },
     };
 }
-
-pub var format: vulkan.VkFormat = undefined; // the standart format for PicturaImages, set during init
 
 pub const PicturaImage = struct {
     w: u32,
@@ -363,4 +363,75 @@ pub fn update_pixels(pimage: *PicturaImage, app: *root.PicturaApp) !void {
     };
 
     vulkan.vkCmdCopyBufferToImage2.?(command_buffer, &copy_info);
+}
+
+pub fn draw_point(
+    dst: *PicturaImage,
+    x: f32,
+    y: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+    stroke_radius: f32,
+    tl: [2]f32,
+    tr: [2]f32,
+    bl: [2]f32,
+    br: [2]f32,
+    app: *root.PicturaApp,
+) !void {
+    const quad_pcs = [10]f32{ 2 / @as(f32, @floatFromInt(dst.w)), 2 / @as(f32, @floatFromInt(dst.h)), tl[0], tl[1], tr[0], tr[1], bl[0], bl[1], br[0], br[1] };
+    const frag_pcs = [7]f32{ r, g, b, a, x, y, stroke_radius };
+
+    var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
+    const command_buffer = try app.well.render_into(dst, &barrier, app.device);
+
+    const w = dst.w;
+    const h = dst.h;
+    const viewport: vulkan.VkViewport = .{
+        .x = 0.0,
+        .y = 0.0,
+        .width = @floatFromInt(w),
+        .height = @floatFromInt(h),
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    };
+    const scissor: vulkan.VkRect2D = .{
+        .offset = .{ .x = 0, .y = 0 },
+        .extent = .{ .width = w, .height = h },
+    };
+
+    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
+    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_point_pipeline);
+
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_point_pipeline_layout, vulkan.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(@TypeOf(quad_pcs)), &quad_pcs);
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_point_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, @sizeOf(@TypeOf(quad_pcs)), @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
+
+    vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
+}
+
+pub fn draw_point2(
+    dst: *PicturaImage,
+    x: f32,
+    y: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+    stroke_radius: f32,
+    app: *root.PicturaApp,
+) !void {
+    const lx = x - stroke_radius - 1;
+    const rx = x + stroke_radius + 1;
+    const ty = y - stroke_radius - 1;
+    const by = y + stroke_radius + 1;
+
+    const tl = [2]f32{ lx, ty };
+    const tr = [2]f32{ rx, ty };
+    const bl = [2]f32{ lx, by };
+    const br = [2]f32{ rx, by };
+
+    try draw_point(dst, x, y, r, g, b, a, stroke_radius, tl, tr, bl, br, app);
 }

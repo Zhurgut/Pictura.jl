@@ -416,8 +416,8 @@ pub fn two_stage_graphics_pipeline(
     rasterization_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterization_info.polygonMode = vulkan.VK_POLYGON_MODE_FILL;
     rasterization_info.lineWidth = 1.0;
-    rasterization_info.cullMode = vulkan.VK_CULL_MODE_NONE; // parameter?
-    rasterization_info.frontFace = vulkan.VK_FRONT_FACE_COUNTER_CLOCKWISE; // Or CLOCKWISE?
+    rasterization_info.cullMode = vulkan.VK_CULL_MODE_NONE;
+    rasterization_info.frontFace = vulkan.VK_FRONT_FACE_COUNTER_CLOCKWISE; // doesnt matter when cull mode none
 
     pipeline_create_info.pRasterizationState = &rasterization_info;
 

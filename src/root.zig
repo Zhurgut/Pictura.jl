@@ -362,9 +362,11 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-test "toy example" {
-    _ = @import("sdl_utils.zig");
+test "tests in other modules" {
+    // _ = @import("sdl_utils.zig");
+}
 
+test "toy example" {
     const w = 800;
     const h = 600;
     try init._init(w, h, false);
@@ -390,14 +392,15 @@ test "toy example" {
     try pictura_app.swapchain.present(&pictura_app);
 
     const start = sdl.SDL_GetTicksNS();
-    for (0..1000) |_| {
-        if (pictura_app.running) {
-            try pictura_app.event_handler.handle_events(&pictura_app);
-            try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
-            // try image.draw_background(&pictura_app.canvas, 0.5, 0.5, 0.5, 1.0, &pictura_app);
-            try pictura_app.swapchain.present(&pictura_app);
-            sdl.SDL_Delay(8);
-        }
+    while (pictura_app.running) {
+        try pictura_app.event_handler.handle_events(&pictura_app);
+        try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
+        try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
+
+        try image.draw_point2(&pictura_app.canvas, pictura_app.event_handler.mouse.x, pictura_app.event_handler.mouse.y, 0.2, 0.1, 0.8, 1.0, 32, &pictura_app);
+
+        try pictura_app.swapchain.present(&pictura_app);
+        sdl.SDL_Delay(10);
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});

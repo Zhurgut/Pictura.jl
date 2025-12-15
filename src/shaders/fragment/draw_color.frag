@@ -1,11 +1,11 @@
 #version 450
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 out_color;
 
 layout(push_constant) uniform PushConstants {
-    vec4 backgroundColor; // f32(r, g, b, a)
+    vec4 background_color; // f32(r, g, b, a)
 } pc;
 
 void main() {
-    outColor = pc.backgroundColor; 
+    out_color = pc.background_color; 
 }

@@ -108,8 +108,6 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     }
     errdefer sdl.SDL_Vulkan_DestroySurface(@ptrCast(instance), @ptrCast(surface), null);
 
-    image.format = vulkan.VK_FORMAT_R8G8B8A8_UNORM;
-
     const descriptor_pool = try utils.create_descriptor_pool(device);
     errdefer vulkan.vkDestroyDescriptorPool.?(device, descriptor_pool, null);
 
