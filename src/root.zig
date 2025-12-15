@@ -394,10 +394,33 @@ test "toy example" {
     const start = sdl.SDL_GetTicksNS();
     while (pictura_app.running) {
         try pictura_app.event_handler.handle_events(&pictura_app);
-        try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
+        // try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
         try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
-        try image.draw_point2(&pictura_app.canvas, pictura_app.event_handler.mouse.x, pictura_app.event_handler.mouse.y, 0.2, 0.1, 0.8, 1.0, 32, &pictura_app);
+        // try image.draw_point2(
+        //     &pictura_app.canvas,
+        //     pictura_app.event_handler.mouse.x,
+        //     pictura_app.event_handler.mouse.y,
+        //     0.2,
+        //     0.1,
+        //     0.8,
+        //     1.0,
+        //     32,
+        //     &pictura_app,
+        // );
+
+        try image.draw_line(
+            &pictura_app.canvas,
+            [2]f32{ 300, 300 },
+            [2]f32{ pictura_app.event_handler.mouse.x, pictura_app.event_handler.mouse.y },
+            [4]f32{ 0.2, 0.1, 0.8, 1.0 },
+            3.3,
+            [2]f32{ 0, 0 },
+            [2]f32{ 3000, 0 },
+            [2]f32{ 0, 3000 },
+            [2]f32{ 3000, 3000 },
+            &pictura_app,
+        );
 
         try pictura_app.swapchain.present(&pictura_app);
         sdl.SDL_Delay(10);
