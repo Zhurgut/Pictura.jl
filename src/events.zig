@@ -5,6 +5,20 @@ const builtin = @import("builtin");
 
 const sdl = root.sdl;
 
+const DELETE = 127;
+const RIGHT = 128;
+const LEFT = 129;
+const DOWN = 130;
+const UP = 131;
+const SHIFT = 132;
+const CTRL = 133;
+const ALT = 134;
+const HOME = 135;
+const END = 136;
+const PAGEUP = 137;
+const PAGEDOWN = 138;
+const INSERT = 139;
+
 fn debug_mouse_pressed(x: f32, y: f32, button: u32) void {
     std.debug.print("mouse button {d} pressed at ({d}, {d})\n", .{ button, x, y });
 }
@@ -247,22 +261,22 @@ fn to_char(keycode: sdl.SDL_Keycode) u8 {
         sdl.SDLK_Y => 'y',
         sdl.SDLK_Z => 'z',
 
-        sdl.SDLK_DELETE => 127,
+        sdl.SDLK_DELETE => DELETE,
 
         // defined myself:
-        sdl.SDLK_RIGHT => 128,
-        sdl.SDLK_LEFT => 129,
-        sdl.SDLK_DOWN => 130,
-        sdl.SDLK_UP => 131,
-        sdl.SDLK_LSHIFT, sdl.SDLK_RSHIFT => 132,
-        sdl.SDLK_LCTRL, sdl.SDLK_RCTRL => 133,
-        sdl.SDLK_LALT, sdl.SDLK_RALT => 134,
+        sdl.SDLK_RIGHT => RIGHT,
+        sdl.SDLK_LEFT => LEFT,
+        sdl.SDLK_DOWN => DOWN,
+        sdl.SDLK_UP => UP,
+        sdl.SDLK_LSHIFT, sdl.SDLK_RSHIFT => SHIFT,
+        sdl.SDLK_LCTRL, sdl.SDLK_RCTRL => CTRL,
+        sdl.SDLK_LALT, sdl.SDLK_RALT => ALT,
 
-        sdl.SDLK_HOME => 135,
-        sdl.SDLK_END => 136,
-        sdl.SDLK_PAGEUP => 137,
-        sdl.SDLK_PAGEDOWN => 138,
-        sdl.SDLK_INSERT => 139,
+        sdl.SDLK_HOME => HOME,
+        sdl.SDLK_END => END,
+        sdl.SDLK_PAGEUP => PAGEUP,
+        sdl.SDLK_PAGEDOWN => PAGEDOWN,
+        sdl.SDLK_INSERT => INSERT,
         else => 0,
     };
 }
