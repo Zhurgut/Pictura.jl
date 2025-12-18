@@ -1,13 +1,17 @@
 const std = @import("std");
 const testing = std.testing;
 const assert = std.debug.assert;
+const builtin = @import("builtin");
 
 pub const sdl = @cImport({
     @cInclude("SDL3/SDL.h");
     @cInclude("SDL3/SDL_vulkan.h");
 });
 
-pub const vulkan = @cImport({
+pub const vulkan = if (builtin.os.tag == .windows) @cImport({
+    @cDefine("WINDOWS", {});
+    @cInclude("src/init/init_vulkan.h");
+}) else @cImport({
     @cInclude("src/init/init_vulkan.h");
 });
 
@@ -363,8 +367,13 @@ fn WellOfCommands2(comptime n: u32) type {
 }
 
 test "tests in other modules" {
-    // _ = @import("sdl_utils.zig");
+    _ = @import("sdl_utils.zig");
 }
+
+// test "test" {
+//     try init._init(800, 600, false);
+//     init.quit();
+// }
 
 test "toy example" {
     const w = 800;
@@ -389,13 +398,13 @@ test "toy example" {
 
     try image.update_pixels(&pictura_app.canvas, &pictura_app);
 
-    try pictura_app.swapchain.present(&pictura_app);
+    // try pictura_app.swapchain.present(&pictura_app);
 
     const start = sdl.SDL_GetTicksNS();
     while (pictura_app.running) {
         try pictura_app.event_handler.handle_events(&pictura_app);
-        // try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
-        try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
+        try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
+        // try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
         // try image.draw_point2(
         //     &pictura_app.canvas,

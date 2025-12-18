@@ -2,8 +2,12 @@
 #define INITH
 
 
+#ifdef WINDOWS
+#include "Volk/volk.h"
+#else
+#include "volk/volk.h"
+#endif
 
-#include <Volk/volk.h>
 #include <stdio.h>
 #include <vulkan/vk_enum_string_helper.h>
 

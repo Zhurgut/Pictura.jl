@@ -23,14 +23,15 @@ pub fn build(b: *std.Build) !void {
 
     lib_mod.link_libc = true;
     lib_mod.linkSystemLibrary("SDL3", .{});
+
     lib_mod.addIncludePath(.{ .cwd_relative = "./" });
-    lib_mod.addIncludePath(.{ .cwd_relative = "C:/msys64/ucrt64/include" });
-    lib_mod.addIncludePath(.{ .cwd_relative = "C:/VulkanSDK/1.4.328.1/Include" });
-    // lib_mod.addIncludePath(.{ .cwd_relative = "./" });
 
     lib_mod.addCSourceFile(.{ .file = .{ .cwd_relative = "src/init/init_vulkan.c" } });
 
     if (builtin.os.tag == .windows) {
+        lib_mod.addIncludePath(.{ .cwd_relative = "C:/msys64/ucrt64/include" });
+        lib_mod.addIncludePath(.{ .cwd_relative = "C:/VulkanSDK/1.4.328.1/Include" });
+
         lib_mod.linkSystemLibrary("user32", .{});
         lib_mod.linkSystemLibrary("gdi32", .{});
         lib_mod.linkSystemLibrary("winmm", .{});
@@ -40,9 +41,7 @@ pub fn build(b: *std.Build) !void {
         lib_mod.linkSystemLibrary("version", .{});
         lib_mod.linkSystemLibrary("oleaut32", .{});
     } else if (builtin.os.tag == .linux) {
-        lib_mod.linkSystemLibrary("dl", .{});
-        lib_mod.linkSystemLibrary("pthread", .{});
-        lib_mod.linkSystemLibrary("m", .{});
+        lib_mod.addIncludePath(.{ .cwd_relative = "$VULKAN_SDK/x86_64/include" });
     } else if (builtin.os.tag == .macos) {
         lib_mod.linkFramework("Cocoa", .{});
         lib_mod.linkFramework("CoreAudio", .{});

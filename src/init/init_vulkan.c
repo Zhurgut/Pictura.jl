@@ -2,7 +2,7 @@
 #define VOLK_IMPLEMENTATION
 
 #include "init_vulkan.h"
-#include <vulkan/vk_enum_string_helper.h>
+
 #include <stdio.h>
 #include <string.h>
 
