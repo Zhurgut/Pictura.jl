@@ -114,18 +114,17 @@ pub const EventHandler = struct {
 
     pub fn handle_events(eh: *EventHandler, app: *root.PicturaApp) !void {
         var event: sdl.SDL_Event = undefined;
+        var new_w: ?u32 = null;
+        var new_h: ?u32 = null;
+
         while (sdl.SDL_PollEvent(&event)) {
             switch (event.type) {
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED, sdl.SDL_EVENT_WINDOW_DESTROYED, sdl.SDL_EVENT_QUIT => {
                     app.running = false;
                 },
                 sdl.SDL_EVENT_WINDOW_RESIZED, sdl.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => {
-                    const w = event.window.data1;
-                    const h = event.window.data2;
-
-                    std.debug.print("size changed {d} {d}\n", .{ w, h });
-
-                    try app.resize(@intCast(w), @intCast(h));
+                    new_w = @intCast(event.window.data1);
+                    new_h = @intCast(event.window.data2);
                 },
                 sdl.SDL_EVENT_WINDOW_MOVED => {
                     const x = event.window.data1;
@@ -208,6 +207,17 @@ pub const EventHandler = struct {
                 },
                 else => {},
             }
+        }
+
+        if (new_w != null and new_w != null) {
+            if (new_w.? != app.canvas.w or new_h.? != app.canvas.h) {
+                std.debug.print("size changed {d} {d}\n", .{ new_w.?, new_h.? });
+                try app.resize(new_w.?, new_h.?);
+            }
+        }
+
+        if (app.swapchain.request_recreation) { // failsafe kindof
+            try app.resize(app.canvas.w, app.canvas.h);
         }
     }
 };

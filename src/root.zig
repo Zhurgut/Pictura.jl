@@ -45,10 +45,23 @@ pub const PicturaApp = struct {
     running: bool,
     event_handler: events.EventHandler,
 
-    pub fn resize(app: *PicturaApp, w: u32, h: u32) !void {
-        if (app.canvas.w == w and app.canvas.h == h) {
-            return;
-        }
+    pub fn resize(app: *PicturaApp, target_w: u32, target_h: u32) !void {
+        try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
+
+        app.swapchain.destroy(app.device);
+
+        var swapchain2 = try swapchain.Swapchain.create(
+            app.physical_device,
+            app.device,
+            app.queue_family_index,
+            app.surface,
+            target_w,
+            target_h,
+        );
+        errdefer swapchain2.destroy(app.device);
+
+        const w = swapchain2.images[0].w; // actual image size that we got after resizing
+        const h = swapchain2.images[0].h;
 
         var new_canvas = try image.PicturaImage.create(
             w,
@@ -64,17 +77,6 @@ pub const PicturaApp = struct {
         try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
 
         app.canvas.destroy(app.device, app.descriptor_pool);
-        app.swapchain.destroy(app.device);
-
-        var swapchain2 = try swapchain.Swapchain.create(
-            app.physical_device,
-            app.device,
-            app.queue_family_index,
-            app.surface,
-            w,
-            h,
-        );
-        errdefer swapchain2.destroy(app.device);
 
         app.canvas = new_canvas;
         app.swapchain = swapchain2;

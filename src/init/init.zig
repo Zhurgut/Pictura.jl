@@ -161,17 +161,17 @@ pub export fn quit() void {
 
     vulkan.vkDestroyDescriptorPool.?(app.device, app.descriptor_pool, null);
 
-    sdl.SDL_Vulkan_DestroySurface(@ptrCast(app.instance), @ptrCast(app.surface), null);
-
     vulkan.vkDestroyCommandPool.?(app.device, app.command_pool, null);
 
     root.shaders.modules.destroy(app.device);
 
     vulkan.vkDestroyDevice.?(app.device, null);
 
-    vulkan.vkDestroyInstance.?(app.instance, null);
+    sdl.SDL_Vulkan_DestroySurface(@ptrCast(app.instance), @ptrCast(app.surface), null);
 
     sdl.SDL_DestroyWindow(app.window);
+
+    // vulkan.vkDestroyInstance.?(app.instance, null); // hangs :(
 
     sdl.SDL_Quit();
 

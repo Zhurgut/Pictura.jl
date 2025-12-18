@@ -12,6 +12,7 @@ pub const Swapchain = struct {
     img_format: vulkan.VkFormat,
     view_format: vulkan.VkFormat,
     semaphores: SemaphoreClub(4),
+    request_recreation: bool = false,
 
     fn unorm_format(format: vulkan.VkFormat) vulkan.VkFormat {
         return switch (format) {
@@ -35,9 +36,12 @@ pub const Swapchain = struct {
     ) !Swapchain {
         var out: Swapchain = undefined;
 
-        _, const format, const colorspace = try get_infos(physical_device, queue_family_index, surface);
+        const capabilites, const format, const colorspace = try get_infos(physical_device, queue_family_index, surface);
 
-        const swapchain = try create_swapchain(device, surface, w, h, format, colorspace, null);
+        const actual_w = std.math.clamp(w, capabilites.minImageExtent.width, capabilites.maxImageExtent.width);
+        const actual_h = std.math.clamp(h, capabilites.minImageExtent.height, capabilites.maxImageExtent.height);
+
+        const swapchain = try create_swapchain(device, surface, actual_w, actual_h, format, colorspace, null);
         errdefer vulkan.vkDestroySwapchainKHR.?(device, swapchain, null);
 
         var count: u32 = 3;
@@ -54,8 +58,8 @@ pub const Swapchain = struct {
 
         for (0..out.images.len) |i| {
             out.images[i] = .{
-                .w = w,
-                .h = h,
+                .w = actual_w,
+                .h = actual_h,
                 .memory = null,
                 .image = images[i],
                 .image_view = try utils.create_image_view(images[i], device, out.view_format),
@@ -100,12 +104,11 @@ pub const Swapchain = struct {
         }
 
         var image_index: u32 = 0;
-        const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired, null, &image_index); // on my pc always succeeds (since always calling present as well?)
+        const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired, null, &image_index);
 
-        std.debug.assert(acquire_image_success != vulkan.VK_SUBOPTIMAL_KHR);
-
-        if (acquire_image_success == vulkan.VK_NOT_READY) {
+        if (acquire_image_success != vulkan.VK_SUCCESS) {
             // std.debug.print("-", .{});
+            std.debug.print("acquire image: {s}\n", .{vulkan.string_VkResult(acquire_image_success)});
             return;
         }
 
@@ -152,9 +155,16 @@ pub const Swapchain = struct {
         };
 
         const result = vulkan.vkQueuePresentKHR.?(app.queue, &present_info);
-        if (result != vulkan.VK_SUCCESS) {
-            std.debug.print("failed to present: {s}\n", .{vulkan.string_VkResult(result)});
-            return error.Vk_failed_to_present;
+
+        switch (result) {
+            vulkan.VK_SUCCESS => {},
+            vulkan.VK_SUBOPTIMAL_KHR, vulkan.VK_ERROR_OUT_OF_DATE_KHR => {
+                swapchain.request_recreation = true;
+            },
+            else => {
+                std.debug.print("failed to present: {s}\n", .{vulkan.string_VkResult(result)});
+                return error.Vk_failed_to_present;
+            },
         }
     }
 };
