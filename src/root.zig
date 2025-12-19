@@ -409,6 +409,19 @@ test "toy example" {
         //     &pictura_app,
         // );
 
+        try image.draw_ellipse(
+            &pictura_app.canvas,
+            [4]f32{ 0.1, 0.2, 0.8, 0.9 },
+            [4]f32{ 0.6, 0.1, 0.6, 0.8 },
+            [2]f32{ 250, 102 },
+            4,
+            [2]f32{ 162.364, 327.396 - 200 },
+            [2]f32{ 690.5, 439.964 - 200 },
+            [2]f32{ 111.5, 566.036 - 200 },
+            [2]f32{ 639.636, 678.604 - 200 },
+            &pictura_app,
+        );
+
         try image.draw_line(
             &pictura_app.canvas,
             [2]f32{ 300, 300 },

@@ -23,6 +23,9 @@ pub const Pipelines = struct {
     draw_line_pipeline_layout: vulkan.VkPipelineLayout,
     draw_line_pipeline: vulkan.VkPipeline,
 
+    draw_ellipse_pipeline_layout: vulkan.VkPipelineLayout,
+    draw_ellipse_pipeline: vulkan.VkPipeline,
+
     pub fn create(device: vulkan.VkDevice, swapchain_img_format: vulkan.VkFormat) !Pipelines {
         var out: Pipelines = undefined;
 
@@ -48,6 +51,12 @@ pub const Pipelines = struct {
             .stageFlags = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT,
             .offset = quad_pcr.size, // after quad_pcr
             .size = 9 * @sizeOf(f32),
+        };
+
+        const draw_ellipse_pcr: vulkan.VkPushConstantRange = .{
+            .stageFlags = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset = quad_pcr.size, // after quad_pcr
+            .size = 19 * @sizeOf(f32),
         };
 
         //
@@ -109,6 +118,7 @@ pub const Pipelines = struct {
             shaders.modules.draw_point,
             quad_pcr,
             draw_point_pcr,
+            false,
         );
         errdefer vulkan.vkDestroyPipelineLayout.?(device, out.draw_point_pipeline_layout, null);
         errdefer vulkan.vkDestroyPipeline.?(device, out.draw_point_pipeline, null);
@@ -118,16 +128,31 @@ pub const Pipelines = struct {
             shaders.modules.draw_line,
             quad_pcr,
             draw_line_pcr,
+            false,
         );
         errdefer vulkan.vkDestroyPipelineLayout.?(device, out.draw_line_pipeline_layout, null);
         errdefer vulkan.vkDestroyPipeline.?(device, out.draw_line_pipeline, null);
+
+        out.draw_ellipse_pipeline_layout, out.draw_ellipse_pipeline = try draw_shape_pipeline(
+            device,
+            shaders.modules.draw_ellipse,
+            quad_pcr,
+            draw_ellipse_pcr,
+            true,
+        );
+        errdefer vulkan.vkDestroyPipelineLayout.?(device, out.draw_ellipse_pipeline_layout, null);
+        errdefer vulkan.vkDestroyPipeline.?(device, out.draw_ellipse_pipeline, null);
 
         return out;
     }
 
     pub fn destroy(pipelines: *Pipelines, device: vulkan.VkDevice) void {
+        vulkan.vkDestroyPipeline.?(device, pipelines.draw_ellipse_pipeline, null);
+        vulkan.vkDestroyPipelineLayout.?(device, pipelines.draw_ellipse_pipeline_layout, null);
+
         vulkan.vkDestroyPipeline.?(device, pipelines.draw_line_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.draw_line_pipeline_layout, null);
+
         vulkan.vkDestroyPipeline.?(device, pipelines.draw_point_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.draw_point_pipeline_layout, null);
 
@@ -225,6 +250,7 @@ fn draw_shape_pipeline(
     fragshader: vulkan.VkShaderModule,
     vertex_pcr: vulkan.VkPushConstantRange,
     frag_pcr: vulkan.VkPushConstantRange,
+    centered: bool,
 ) !struct { vulkan.VkPipelineLayout, vulkan.VkPipeline } {
     const pcrs = [2]vulkan.VkPushConstantRange{ vertex_pcr, frag_pcr };
 
@@ -245,7 +271,7 @@ fn draw_shape_pipeline(
     const pipeline = try utils.two_stage_graphics_pipeline(
         device,
         image.format,
-        shaders.modules.quad,
+        if (centered) shaders.modules.quad_centered_out else shaders.modules.quad,
         fragshader,
         pipeline_layout,
         vulkan.VK_TRUE,

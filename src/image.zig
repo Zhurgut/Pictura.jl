@@ -480,3 +480,61 @@ pub fn draw_line(
 
     vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
 }
+
+pub fn draw_ellipse(
+    dst: *PicturaImage,
+    fill_color: [4]f32,
+    stroke_color: [4]f32,
+    ellipse_radius: [2]f32,
+    stroke_radius: f32,
+    tl: [2]f32,
+    tr: [2]f32,
+    bl: [2]f32,
+    br: [2]f32,
+    app: *root.PicturaApp,
+) !void {
+    const quad_pcs = [2]f32{ 2 / @as(f32, @floatFromInt(dst.w)), 2 / @as(f32, @floatFromInt(dst.h)) } ++ tl ++ tr ++ bl ++ br;
+
+    std.debug.assert(ellipse_radius[0] >= ellipse_radius[1]);
+
+    const s: f32 = ellipse_radius[0] / ellipse_radius[1];
+    const frag_pcs = fill_color ++ stroke_color ++ ellipse_radius ++ [_]f32{
+        1 / ellipse_radius[1], // one_over_radius_y
+        s, // ratio >= 1
+        1 / s, // one_over_ratio
+        (s * s - 1) / s, // peak
+        -s * s / (s * s - 1 + 1e-6), // A
+        2 * s, // B
+        -(s * s - 1), // C
+        (s * s - 1) / (-2 * s * s), // one over 2A
+        stroke_radius,
+    };
+
+    var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
+    const command_buffer = try app.well.render_into(dst, &barrier, app.device);
+
+    const w = dst.w;
+    const h = dst.h;
+    const viewport: vulkan.VkViewport = .{
+        .x = 0.0,
+        .y = 0.0,
+        .width = @floatFromInt(w),
+        .height = @floatFromInt(h),
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    };
+    const scissor: vulkan.VkRect2D = .{
+        .offset = .{ .x = 0, .y = 0 },
+        .extent = .{ .width = w, .height = h },
+    };
+
+    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
+    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_ellipse_pipeline);
+
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_ellipse_pipeline_layout, vulkan.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(@TypeOf(quad_pcs)), &quad_pcs);
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_ellipse_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, @sizeOf(@TypeOf(quad_pcs)), @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
+
+    vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
+}
