@@ -99,20 +99,31 @@ pub const Swapchain = struct {
         const ready = try swapchain.semaphores.if_ready_get_image_acquired_semaphore(app.device, &image_acquired);
 
         if (!ready) {
-            // std.debug.print("-", .{});
             return;
         }
 
         var image_index: u32 = 0;
         const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired, null, &image_index);
 
-        if (acquire_image_success != vulkan.VK_SUCCESS) {
-            // std.debug.print("-", .{});
-            std.debug.print("acquire image: {s}\n", .{vulkan.string_VkResult(acquire_image_success)});
-            return;
+        switch (acquire_image_success) {
+            vulkan.VK_SUCCESS => {},
+            vulkan.VK_SUBOPTIMAL_KHR => {
+                swapchain.request_recreation = true;
+            },
+            vulkan.VK_TIMEOUT => {
+                return;
+            },
+            vulkan.VK_ERROR_OUT_OF_DATE_KHR => {
+                // If VK_ERROR_OUT_OF_DATE_KHR is returned, no image is acquired...
+                // Applications need to create a new swapchain for the surface to continue presenting if VK_ERROR_OUT_OF_DATE_KHR is returned.
+                swapchain.request_recreation = true;
+                return;
+            },
+            else => {
+                std.debug.print("acquire image: {s}\n", .{vulkan.string_VkResult(acquire_image_success)});
+                return error.failed_to_acquire_image;
+            },
         }
-
-        // std.debug.print("*", .{});
 
         // otherwise, we are presenting!
 

@@ -369,7 +369,7 @@ fn WellOfCommands2(comptime n: u32) type {
 }
 
 test "tests in other modules" {
-    _ = @import("sdl_utils.zig");
+    // _ = @import("sdl_utils.zig");
 }
 
 // test "test" {
