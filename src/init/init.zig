@@ -122,6 +122,10 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, dev_mem);
     errdefer canvas.destroy(device);
 
+    var numkeys: i32 = undefined;
+    const kb = sdl.SDL_GetKeyboardState(&numkeys);
+    root.events.keyboard = kb[0..@intCast(numkeys)];
+
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
     errdefer arena.deinit();
 

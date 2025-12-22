@@ -464,6 +464,13 @@ test "toy example" {
             &pictura_app,
         );
 
+        if (events.is_key_pressed('m')) {
+            std.debug.print("m", .{});
+        }
+        if (events.is_key_pressed(events.SHIFT)) {
+            std.debug.print("SHIFT!", .{});
+        }
+
         try pictura_app.swapchain.present(&pictura_app);
         sdl.SDL_Delay(10);
     }

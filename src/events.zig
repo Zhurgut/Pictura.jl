@@ -5,19 +5,21 @@ const builtin = @import("builtin");
 
 const sdl = root.sdl;
 
-const DELETE = 127;
-const RIGHT = 128;
-const LEFT = 129;
-const DOWN = 130;
-const UP = 131;
-const SHIFT = 132;
-const CTRL = 133;
-const ALT = 134;
-const HOME = 135;
-const END = 136;
-const PAGEUP = 137;
-const PAGEDOWN = 138;
-const INSERT = 139;
+pub var keyboard: []const bool = undefined;
+
+pub const DELETE = 127;
+pub const RIGHT = 128;
+pub const LEFT = 129;
+pub const DOWN = 130;
+pub const UP = 131;
+pub const SHIFT = 132;
+pub const CTRL = 133;
+pub const ALT = 134;
+pub const HOME = 135;
+pub const END = 136;
+pub const PAGEUP = 137;
+pub const PAGEDOWN = 138;
+pub const INSERT = 139;
 
 fn debug_mouse_pressed(x: f32, y: f32, button: u32) void {
     std.debug.print("mouse button {d} pressed at ({d}, {d})\n", .{ button, x, y });
@@ -273,7 +275,6 @@ fn to_char(keycode: sdl.SDL_Keycode) u8 {
 
         sdl.SDLK_DELETE => DELETE,
 
-        // defined myself:
         sdl.SDLK_RIGHT => RIGHT,
         sdl.SDLK_LEFT => LEFT,
         sdl.SDLK_DOWN => DOWN,
@@ -289,4 +290,86 @@ fn to_char(keycode: sdl.SDL_Keycode) u8 {
         sdl.SDLK_INSERT => INSERT,
         else => 0,
     };
+}
+
+fn to_keycode(key: u8, out_codes: [*]sdl.SDL_Keycode) usize {
+    const keycodes: []const sdl.SDL_Keycode = switch (key) {
+        '\r' => &[_]sdl.SDL_Keycode{ sdl.SDLK_RETURN, sdl.SDLK_KP_ENTER },
+        8 => &[_]sdl.SDL_Keycode{sdl.SDLK_BACKSPACE},
+        '\t' => &[_]sdl.SDL_Keycode{sdl.SDLK_TAB},
+        ' ' => &[_]sdl.SDL_Keycode{sdl.SDLK_SPACE},
+        '*' => &[_]sdl.SDL_Keycode{sdl.SDLK_KP_MULTIPLY},
+        '+' => &[_]sdl.SDL_Keycode{sdl.SDLK_KP_PLUS},
+        ',' => &[_]sdl.SDL_Keycode{ sdl.SDLK_COMMA, sdl.SDLK_KP_COMMA },
+        '-' => &[_]sdl.SDL_Keycode{ sdl.SDLK_MINUS, sdl.SDLK_KP_MINUS },
+        '.' => &[_]sdl.SDL_Keycode{ sdl.SDLK_PERIOD, sdl.SDLK_KP_PERIOD },
+        '/' => &[_]sdl.SDL_Keycode{sdl.SDLK_KP_DIVIDE},
+        '0' => &[_]sdl.SDL_Keycode{ sdl.SDLK_0, sdl.SDLK_KP_0 },
+        '1' => &[_]sdl.SDL_Keycode{ sdl.SDLK_1, sdl.SDLK_KP_1 },
+        '2' => &[_]sdl.SDL_Keycode{ sdl.SDLK_2, sdl.SDLK_KP_2 },
+        '3' => &[_]sdl.SDL_Keycode{ sdl.SDLK_3, sdl.SDLK_KP_3 },
+        '4' => &[_]sdl.SDL_Keycode{ sdl.SDLK_4, sdl.SDLK_KP_4 },
+        '5' => &[_]sdl.SDL_Keycode{ sdl.SDLK_5, sdl.SDLK_KP_5 },
+        '6' => &[_]sdl.SDL_Keycode{ sdl.SDLK_6, sdl.SDLK_KP_6 },
+        '7' => &[_]sdl.SDL_Keycode{ sdl.SDLK_7, sdl.SDLK_KP_7 },
+        '8' => &[_]sdl.SDL_Keycode{ sdl.SDLK_8, sdl.SDLK_KP_8 },
+        '9' => &[_]sdl.SDL_Keycode{ sdl.SDLK_9, sdl.SDLK_KP_9 },
+        'a' => &[_]sdl.SDL_Keycode{sdl.SDLK_A},
+        'b' => &[_]sdl.SDL_Keycode{sdl.SDLK_B},
+        'c' => &[_]sdl.SDL_Keycode{sdl.SDLK_C},
+        'd' => &[_]sdl.SDL_Keycode{sdl.SDLK_D},
+        'e' => &[_]sdl.SDL_Keycode{sdl.SDLK_E},
+        'f' => &[_]sdl.SDL_Keycode{sdl.SDLK_F},
+        'g' => &[_]sdl.SDL_Keycode{sdl.SDLK_G},
+        'h' => &[_]sdl.SDL_Keycode{sdl.SDLK_H},
+        'i' => &[_]sdl.SDL_Keycode{sdl.SDLK_I},
+        'j' => &[_]sdl.SDL_Keycode{sdl.SDLK_J},
+        'k' => &[_]sdl.SDL_Keycode{sdl.SDLK_K},
+        'l' => &[_]sdl.SDL_Keycode{sdl.SDLK_L},
+        'm' => &[_]sdl.SDL_Keycode{sdl.SDLK_M},
+        'n' => &[_]sdl.SDL_Keycode{sdl.SDLK_N},
+        'o' => &[_]sdl.SDL_Keycode{sdl.SDLK_O},
+        'p' => &[_]sdl.SDL_Keycode{sdl.SDLK_P},
+        'q' => &[_]sdl.SDL_Keycode{sdl.SDLK_Q},
+        'r' => &[_]sdl.SDL_Keycode{sdl.SDLK_R},
+        's' => &[_]sdl.SDL_Keycode{sdl.SDLK_S},
+        't' => &[_]sdl.SDL_Keycode{sdl.SDLK_T},
+        'u' => &[_]sdl.SDL_Keycode{sdl.SDLK_U},
+        'v' => &[_]sdl.SDL_Keycode{sdl.SDLK_V},
+        'w' => &[_]sdl.SDL_Keycode{sdl.SDLK_W},
+        'x' => &[_]sdl.SDL_Keycode{sdl.SDLK_X},
+        'y' => &[_]sdl.SDL_Keycode{sdl.SDLK_Y},
+        'z' => &[_]sdl.SDL_Keycode{sdl.SDLK_Z},
+        DELETE => &[_]sdl.SDL_Keycode{sdl.SDLK_DELETE},
+        RIGHT => &[_]sdl.SDL_Keycode{sdl.SDLK_RIGHT},
+        LEFT => &[_]sdl.SDL_Keycode{sdl.SDLK_LEFT},
+        DOWN => &[_]sdl.SDL_Keycode{sdl.SDLK_DOWN},
+        UP => &[_]sdl.SDL_Keycode{sdl.SDLK_UP},
+        SHIFT => &[_]sdl.SDL_Keycode{ sdl.SDLK_LSHIFT, sdl.SDLK_RSHIFT },
+        CTRL => &[_]sdl.SDL_Keycode{ sdl.SDLK_LCTRL, sdl.SDLK_RCTRL },
+        ALT => &[_]sdl.SDL_Keycode{ sdl.SDLK_LALT, sdl.SDLK_RALT },
+        HOME => &[_]sdl.SDL_Keycode{sdl.SDLK_HOME},
+        END => &[_]sdl.SDL_Keycode{sdl.SDLK_END},
+        PAGEUP => &[_]sdl.SDL_Keycode{sdl.SDLK_PAGEUP},
+        PAGEDOWN => &[_]sdl.SDL_Keycode{sdl.SDLK_PAGEDOWN},
+        INSERT => &[_]sdl.SDL_Keycode{sdl.SDLK_INSERT},
+        else => &[_]sdl.SDL_Keycode{0},
+    };
+
+    @memmove(out_codes, keycodes);
+    return keycodes.len;
+}
+
+pub fn is_key_pressed(key: u8) bool {
+    var key_codes_buf = [3]sdl.SDL_Keycode{ 0, 0, 0 };
+    const l = to_keycode(key, &key_codes_buf);
+    const key_codes = key_codes_buf[0..l];
+
+    var pressed = false;
+    for (key_codes) |k| {
+        const scancode = sdl.SDL_GetScancodeFromKey(k, null);
+        pressed |= keyboard[scancode];
+    }
+
+    return pressed;
 }
