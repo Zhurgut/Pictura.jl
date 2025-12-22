@@ -44,8 +44,11 @@ pub const PicturaApp = struct {
     pipelines: pipelines.Pipelines,
     running: bool,
     event_handler: events.EventHandler,
+    arena: std.heap.ArenaAllocator,
+    gpa: std.mem.Allocator,
 
     pub fn resize(app: *PicturaApp, target_w: u32, target_h: u32) !void {
+        std.debug.print("resizing\n", .{});
         try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
 
         app.swapchain.destroy(app.device);

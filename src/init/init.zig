@@ -122,8 +122,8 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
     var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, dev_mem);
     errdefer canvas.destroy(device);
 
-    // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
-    // errdefer arena.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
+    errdefer arena.deinit();
 
     root.pictura_app = .{
         .window = window.?,
@@ -141,12 +141,14 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         .pipelines = pipelines,
         .running = true,
         .event_handler = .create(),
+        .arena = arena,
+        .gpa = arena.allocator(),
     };
 
     return;
 }
 
-pub export fn quit() void {
+pub fn quit() void {
     var app = root.pictura_app;
 
     _ = vulkan.vkDeviceWaitIdle.?(app.device);
@@ -175,7 +177,7 @@ pub export fn quit() void {
 
     sdl.SDL_Quit();
 
-    // app.arena.deinit();
+    app.arena.deinit();
 
     // app = std.mem.zeroes(PicturaApp);
 }
