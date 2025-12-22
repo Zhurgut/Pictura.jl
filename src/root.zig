@@ -406,7 +406,7 @@ test "toy example" {
     while (pictura_app.running) {
         try pictura_app.event_handler.handle_events(&pictura_app);
         try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
-        // try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
+        try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
         // try image.draw_point2(
         //     &pictura_app.canvas,
@@ -430,6 +430,21 @@ test "toy example" {
             [2]f32{ 690.5, 439.964 - 200 },
             [2]f32{ 111.5, 566.036 - 200 },
             [2]f32{ 639.636, 678.604 - 200 },
+            &pictura_app,
+        );
+
+        try image.draw_rect(
+            &pictura_app.canvas,
+            [4]f32{ 0.1, 0.6, 0.2, 0.9 },
+            [4]f32{ 0.6, 0.8, 0.2, 0.6 },
+            5,
+            450,
+            200,
+            20,
+            [2]f32{ 162.364, 327.396 - 20 },
+            [2]f32{ 690.5, 439.964 - 20 },
+            [2]f32{ 111.5, 566.036 - 20 },
+            [2]f32{ 639.636, 678.604 - 20 },
             &pictura_app,
         );
 

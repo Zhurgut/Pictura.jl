@@ -196,17 +196,7 @@ pub const PicturaImage = struct {
     }
 };
 
-pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
-    var command_buffer = try app.well.record(app.device);
-
-    var src_barrier = utils.get_image_memory_barrier(src, .copy_src, app.queue_family_index);
-    utils.submit_image_memory_barrier(command_buffer, &src_barrier);
-
-    var dst_barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
-    command_buffer = try app.well.render_into(dst, &dst_barrier, app.device);
-
-    const w = dst.w;
-    const h = dst.h;
+fn set_viewport_and_scissor(w: u32, h: u32, command_buffer: vulkan.VkCommandBuffer) void {
     const viewport: vulkan.VkViewport = .{
         .x = 0.0,
         .y = 0.0,
@@ -222,6 +212,18 @@ pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipel
 
     vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
     vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+}
+
+pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
+    var command_buffer = try app.well.record(app.device);
+
+    var src_barrier = utils.get_image_memory_barrier(src, .copy_src, app.queue_family_index);
+    utils.submit_image_memory_barrier(command_buffer, &src_barrier);
+
+    var dst_barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
+    command_buffer = try app.well.render_into(dst, &dst_barrier, app.device);
+
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
 
     vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
@@ -251,23 +253,7 @@ pub fn draw_background(dst: *PicturaImage, r: f32, g: f32, b: f32, a: f32, app: 
     var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
     const command_buffer = try app.well.render_into(dst, &barrier, app.device);
 
-    const w = dst.w;
-    const h = dst.h;
-    const viewport: vulkan.VkViewport = .{
-        .x = 0.0,
-        .y = 0.0,
-        .width = @floatFromInt(w),
-        .height = @floatFromInt(h),
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
-    };
-    const scissor: vulkan.VkRect2D = .{
-        .offset = .{ .x = 0, .y = 0 },
-        .extent = .{ .width = w, .height = h },
-    };
-
-    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
-    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
 
     vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_background_pipeline);
     vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_background_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, 0, @sizeOf(@TypeOf(color)), &color);
@@ -383,23 +369,7 @@ pub fn draw_point(
     var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
     const command_buffer = try app.well.render_into(dst, &barrier, app.device);
 
-    const w = dst.w;
-    const h = dst.h;
-    const viewport: vulkan.VkViewport = .{
-        .x = 0.0,
-        .y = 0.0,
-        .width = @floatFromInt(w),
-        .height = @floatFromInt(h),
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
-    };
-    const scissor: vulkan.VkRect2D = .{
-        .offset = .{ .x = 0, .y = 0 },
-        .extent = .{ .width = w, .height = h },
-    };
-
-    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
-    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
 
     vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_point_pipeline);
 
@@ -455,23 +425,7 @@ pub fn draw_line(
     var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
     const command_buffer = try app.well.render_into(dst, &barrier, app.device);
 
-    const w = dst.w;
-    const h = dst.h;
-    const viewport: vulkan.VkViewport = .{
-        .x = 0.0,
-        .y = 0.0,
-        .width = @floatFromInt(w),
-        .height = @floatFromInt(h),
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
-    };
-    const scissor: vulkan.VkRect2D = .{
-        .offset = .{ .x = 0, .y = 0 },
-        .extent = .{ .width = w, .height = h },
-    };
-
-    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
-    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
 
     vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_line_pipeline);
 
@@ -513,28 +467,52 @@ pub fn draw_ellipse(
     var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
     const command_buffer = try app.well.render_into(dst, &barrier, app.device);
 
-    const w = dst.w;
-    const h = dst.h;
-    const viewport: vulkan.VkViewport = .{
-        .x = 0.0,
-        .y = 0.0,
-        .width = @floatFromInt(w),
-        .height = @floatFromInt(h),
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
-    };
-    const scissor: vulkan.VkRect2D = .{
-        .offset = .{ .x = 0, .y = 0 },
-        .extent = .{ .width = w, .height = h },
-    };
-
-    vulkan.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
-    vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
 
     vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_ellipse_pipeline);
 
     vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_ellipse_pipeline_layout, vulkan.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(@TypeOf(quad_pcs)), &quad_pcs);
     vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_ellipse_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, @sizeOf(@TypeOf(quad_pcs)), @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
+
+    vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
+}
+
+pub fn draw_rect(
+    dst: *PicturaImage,
+    fill_color: [4]f32,
+    stroke_color: [4]f32,
+    stroke_radius: f32,
+    rect_width: f32,
+    rect_height: f32,
+    rect_corner_radius: f32,
+    tl: [2]f32,
+    tr: [2]f32,
+    bl: [2]f32,
+    br: [2]f32,
+    app: *root.PicturaApp,
+) !void {
+    const quad_pcs = [2]f32{ 2 / @as(f32, @floatFromInt(dst.w)), 2 / @as(f32, @floatFromInt(dst.h)) } ++ tl ++ tr ++ bl ++ br;
+
+    std.debug.assert(rect_height >= 0);
+    std.debug.assert(rect_width >= 0);
+    std.debug.assert(rect_corner_radius >= 0);
+
+    const frag_pcs = fill_color ++ stroke_color ++ [_]f32{
+        @max(0, 0.5 * rect_height - rect_corner_radius),
+        @max(0, 0.5 * rect_width - rect_corner_radius),
+        rect_corner_radius,
+        stroke_radius,
+    };
+
+    var barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
+    const command_buffer = try app.well.render_into(dst, &barrier, app.device);
+
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_rect_pipeline);
+
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_rect_pipeline_layout, vulkan.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(@TypeOf(quad_pcs)), &quad_pcs);
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_rect_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, @sizeOf(@TypeOf(quad_pcs)), @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
 
     vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
 }
