@@ -96,7 +96,7 @@ pub const Swapchain = struct {
         _ = try app.well.submit(app.device, app.queue, null, null, null, null); // we dont want all the previous work to wait for image acquired, so submit it right away
 
         var image_acquired: vulkan.VkSemaphore = undefined;
-        const ready = try swapchain.semaphores.if_ready_get_image_acquired_semaphore(app.device, &image_acquired);
+        const ready = swapchain.semaphores.if_ready_get_image_acquired_semaphore(app.device, &image_acquired);
 
         if (!ready) {
             return;
@@ -111,6 +111,8 @@ pub const Swapchain = struct {
                 swapchain.request_recreation = true;
             },
             vulkan.VK_TIMEOUT => {
+                // there is a sempaphore that's ready, but the swapchain does not have an image ready
+                swapchain.semaphores.cancel(); // reset the image acquired semaphore to ready
                 return;
             },
             vulkan.VK_ERROR_OUT_OF_DATE_KHR => {
@@ -127,7 +129,7 @@ pub const Swapchain = struct {
 
         // otherwise, we are presenting!
 
-        swapchain.semaphores.using_image_index(image_index);
+        try swapchain.semaphores.using_image_index(app.device, image_index);
 
         try image.copy_img(
             &swapchain.images[image_index],
@@ -219,18 +221,12 @@ pub fn SemaphoreClub(comptime n: u32) type {
             }
         }
 
-        pub fn if_ready_get_image_acquired_semaphore(sems: *SemaphoreClub(n), device: vulkan.VkDevice, sm: *vulkan.VkSemaphore) !bool {
+        pub fn if_ready_get_image_acquired_semaphore(sems: *SemaphoreClub(n), device: vulkan.VkDevice, sm: *vulkan.VkSemaphore) bool {
             for (0..n) |i| {
                 if (sems.used_by_image_index[i] == -1) {
-                    var result = vulkan.vkGetFenceStatus.?(device, sems.fences[i]);
+                    const result = vulkan.vkGetFenceStatus.?(device, sems.fences[i]);
                     if (result == vulkan.VK_NOT_READY) {
                         return false;
-                    }
-
-                    result = vulkan.vkResetFences.?(device, 1, &sems.fences[i]);
-                    if (result != vulkan.VK_SUCCESS) {
-                        std.debug.print("failed to reset fence: {s}\n", .{vulkan.string_VkResult(result)});
-                        return error.Vk_failed_to_reset_fence;
                     }
 
                     sems.last_image_acquired_semaphore_index = @intCast(i);
@@ -242,9 +238,22 @@ pub fn SemaphoreClub(comptime n: u32) type {
             unreachable;
         }
 
-        pub fn using_image_index(sems: *SemaphoreClub(n), idx: u32) void {
+        pub fn cancel(sems: *SemaphoreClub(n)) void {
+            // if semaphore was ready, but acquire failed, reset semaphore to ready
+            sems.used_by_image_index[sems.last_image_acquired_semaphore_index] = -1; // set it back to -1
+        }
+
+        pub fn using_image_index(sems: *SemaphoreClub(n), device: vulkan.VkDevice, idx: u32) !void {
             // when image acquire succeeds, call this function so the semaphore club knows what swapchain image the last semaphore is used with,
             // so it knows when the semaphore is safe to reuse again
+
+            // acquire image succeeded so we can reset the fence
+            const result = vulkan.vkResetFences.?(device, 1, &sems.fences[sems.last_image_acquired_semaphore_index]);
+            if (result != vulkan.VK_SUCCESS) {
+                std.debug.print("failed to reset fence: {s}\n", .{vulkan.string_VkResult(result)});
+                return error.Vk_failed_to_reset_fence;
+            }
+
             for (0..n) |i| {
                 if (sems.used_by_image_index[i] == idx) {
                     sems.used_by_image_index[i] = -1;
