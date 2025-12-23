@@ -48,6 +48,9 @@ pub const PicturaApp = struct {
     gpa: std.mem.Allocator,
 
     pub fn resize(app: *PicturaApp, target_w: u32, target_h: u32) !void {
+        if (app.canvas.w == target_w and app.canvas.h == target_h) {
+            return;
+        }
         std.debug.print("resizing\n", .{});
         try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
 
