@@ -47,12 +47,9 @@ pub fn build(b: *std.Build) !void {
         lib_mod.linkFramework("CoreAudio", .{});
     }
 
-    // Now, we will create a static library based on the module we created above.
-    // This creates a `std.Build.Step.Compile`, which is the build step responsible
-    // for actually invoking the compiler.
     const lib = b.addLibrary(.{
-        .linkage = .static,
-        .name = "PicturaLib",
+        .linkage = .dynamic,
+        .name = "pictura",
         .root_module = lib_mod,
     });
 
