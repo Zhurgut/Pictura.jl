@@ -41,17 +41,17 @@ fn debug_mouse_dragged(x_prev: f32, y_prev: f32, x: f32, y: f32) void {
     std.debug.print("dragged mouse from ({d}, {d}) to ({d}, {d})\n", .{ x_prev, y_prev, x, y });
 }
 
-fn debug_key_pressed(key: u8, shift: bool, ctrl: bool, alt: bool) void {
-    const s = if (shift) "+shift" else "";
-    const c = if (ctrl) "+ctrl" else "";
-    const a = if (alt) "+alt" else "";
+fn debug_key_pressed(key: u8, shift: i32, ctrl: i32, alt: i32) void {
+    const s = if (shift != 0) "+shift" else "";
+    const c = if (ctrl != 0) "+ctrl" else "";
+    const a = if (alt != 0) "+alt" else "";
     std.debug.print("key {c}{s}{s}{s} pressed\n", .{ if (key < 128) key else ' ', s, c, a });
 }
 
-fn debug_key_released(key: u8, shift: bool, ctrl: bool, alt: bool) void {
-    const s = if (shift) "+shift" else "";
-    const c = if (ctrl) "+ctrl" else "";
-    const a = if (alt) "+alt" else "";
+fn debug_key_released(key: u8, shift: i32, ctrl: i32, alt: i32) void {
+    const s = if (shift != 0) "+shift" else "";
+    const c = if (ctrl != 0) "+ctrl" else "";
+    const a = if (alt != 0) "+alt" else "";
     std.debug.print("key {c}{s}{s}{s} released\n", .{ if (key < 128) key else ' ', s, c, a });
 }
 
@@ -93,8 +93,8 @@ pub const EventHandler = struct {
     mouse_wheel_fn: ?*const fn (vert: f32, hori: f32) void = null,
     mouse_moved_fn: ?*const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) void = null,
     mouse_dragged_fn: ?*const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) void = null,
-    key_pressed_fn: ?*const fn (key: u8, shift: bool, ctrl: bool, alt: bool) void = null,
-    key_released_fn: ?*const fn (key: u8, shift: bool, ctrl: bool, alt: bool) void = null,
+    key_pressed_fn: ?*const fn (key: u8, shift: i32, ctrl: i32, alt: i32) void = null,
+    key_released_fn: ?*const fn (key: u8, shift: i32, ctrl: i32, alt: i32) void = null,
 
     pub fn create() EventHandler {
         if (builtin.mode == .Debug) {
@@ -143,7 +143,7 @@ pub const EventHandler = struct {
                     const alt = (mod & sdl.SDL_KMOD_ALT) != 0;
                     if (key == 0) continue;
                     if (eh.key_pressed_fn) |f| {
-                        f(key, shift, ctrl, alt);
+                        f(key, @intFromBool(shift), @intFromBool(ctrl), @intFromBool(alt));
                     }
                 },
                 sdl.SDL_EVENT_KEY_UP => {
@@ -156,7 +156,7 @@ pub const EventHandler = struct {
                     const alt = (mod & sdl.SDL_KMOD_ALT) != 0;
                     if (key == 0) continue;
                     if (eh.key_released_fn) |f| {
-                        f(key, shift, ctrl, alt);
+                        f(key, @intFromBool(shift), @intFromBool(ctrl), @intFromBool(alt));
                     }
                 },
                 sdl.SDL_EVENT_MOUSE_BUTTON_DOWN => {

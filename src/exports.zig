@@ -6,12 +6,13 @@ pub export fn error_string(err: u32) [:0]const u8 {
     return @errorName(@errorFromInt(err));
 }
 
-pub export fn init(w: u32, h: u32, hdpi: bool) u32 {
-    root.init._init(w, h, hdpi) catch |e| {
+pub export fn init(w: u32, h: u32, hdpi: i32) u32 {
+    root.init._init(w, h, hdpi != 0) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
+
 pub export fn get_canvas() *const anyopaque {
     return &root.pictura_app.canvas;
 }
@@ -264,6 +265,10 @@ pub export fn get_mouse_state(x: ?*f32, y: ?*f32, x_prev: ?*f32, y_prev: ?*f32, 
     }
 }
 
+pub export fn is_key_pressed(key: u8) i32 {
+    return @intFromBool(root.event.is_key_pressed(key));
+}
+
 pub export fn set_mouse_position(x: f32, y: f32) void {
     root.sdl_utils.set_mouse_position(root.pictura_app.window, x, y);
 }
@@ -283,10 +288,10 @@ pub export fn set_mouse_moved_fn(f: *const fn (x_prev: f32, y_prev: f32, x: f32,
 pub export fn set_mouse_dragged_fn(f: *const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) void) void {
     root.pictura_app.event_handler.mouse_dragged_fn = f;
 }
-pub export fn set_key_pressed_fn(f: *const fn (key: u8, shift: bool, ctrl: bool, alt: bool) void) void {
+pub export fn set_key_pressed_fn(f: *const fn (key: u8, shift: i32, ctrl: i32, alt: i32) void) void {
     root.pictura_app.event_handler.key_pressed_fn = f;
 }
-pub export fn set_key_released_fn(f: *const fn (key: u8, shift: bool, ctrl: bool, alt: bool) void) void {
+pub export fn set_key_released_fn(f: *const fn (key: u8, shift: i32, ctrl: i32, alt: i32) void) void {
     root.pictura_app.event_handler.key_released_fn = f;
 }
 
