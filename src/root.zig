@@ -23,6 +23,7 @@ pub const shaders = @import("shaders.zig");
 pub const events = @import("events.zig");
 pub const sdl_utils = @import("sdl_utils.zig");
 pub const pipelines = @import("pipelines.zig");
+pub const exports = @import("exports.zig");
 
 pub var pictura_app: PicturaApp = undefined;
 
@@ -46,6 +47,29 @@ pub const PicturaApp = struct {
     event_handler: events.EventHandler,
     arena: std.heap.ArenaAllocator,
     gpa: std.mem.Allocator,
+    target_framerate: f32,
+    target_time: u64,
+    last_frame_time: u64,
+    before_last_time: u64,
+
+    // call before handle events
+    pub fn wait_until_next_frame(app: *PicturaApp) void {
+        const now = sdl.SDL_GetTicksNS();
+
+        const time_to_sleep: u64 = @intCast(@max(0, @as(i64, @intCast(app.target_time)) - @as(i64, @intCast(now))));
+        if (time_to_sleep > 0) {
+            sdl.SDL_DelayNS(time_to_sleep);
+        } else {
+            // forget about the old target time
+            // just pretend 'target time' was 'now' and move on
+            app.target_time = now;
+        }
+
+        app.target_time += @intFromFloat(@floor(@as(f32, 1e9) / app.target_framerate));
+
+        app.before_last_time = app.last_frame_time;
+        app.last_frame_time = now;
+    }
 
     pub fn resize(app: *PicturaApp, target_w: u32, target_h: u32) !void {
         if (app.canvas.w == target_w and app.canvas.h == target_h) {
@@ -374,15 +398,6 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-test "tests in other modules" {
-    // _ = @import("sdl_utils.zig");
-}
-
-// test "test" {
-//     try init._init(800, 600, false);
-//     init.quit();
-// }
-
 test "toy example" {
     const w = 800;
     const h = 600;
@@ -410,6 +425,7 @@ test "toy example" {
 
     const start = sdl.SDL_GetTicksNS();
     while (pictura_app.running) {
+        pictura_app.wait_until_next_frame();
         try pictura_app.event_handler.handle_events(&pictura_app);
         try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
         try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
@@ -474,8 +490,10 @@ test "toy example" {
             std.debug.print("SHIFT!", .{});
         }
 
+        std.debug.print("framerate: {d}\n", .{exports.get_framerate()});
+
         try pictura_app.swapchain.present(&pictura_app);
-        sdl.SDL_Delay(10);
+        // sdl.SDL_Delay(10);
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});

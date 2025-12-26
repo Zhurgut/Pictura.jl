@@ -120,7 +120,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
 
     const dev_mem = try utils.get_device_memory_index(physical_device);
     var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, dev_mem);
-    errdefer canvas.destroy(device);
+    errdefer canvas.destroy(device, descriptor_pool);
 
     var numkeys: i32 = undefined;
     const kb = sdl.SDL_GetKeyboardState(&numkeys);
@@ -128,6 +128,9 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
     errdefer arena.deinit();
+
+    const now = sdl.SDL_GetTicksNS();
+    const framerate = try root.sdl_utils.get_display_refresh_rate(window.?) - 1;
 
     root.pictura_app = .{
         .window = window.?,
@@ -147,6 +150,10 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
         .event_handler = .create(),
         .arena = arena,
         .gpa = arena.allocator(),
+        .target_framerate = framerate,
+        .target_time = now + 2, // target time of next frame, as soon as possible
+        .last_frame_time = now + 1,
+        .before_last_time = now,
     };
 
     return;
