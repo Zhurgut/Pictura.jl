@@ -140,7 +140,7 @@ test "sdl utils" {
         var x: f32 = 0.0;
         var y: f32 = 0.0;
 
-        fn grab(key: u8, _: bool, _: bool, _: bool) void {
+        fn grab(key: u8, _: i32, _: i32, _: i32) callconv(.c) void {
             if (key == 133 and !grabbed) { // CTRL
                 grabbed = true;
                 x, y = get_mouse_position(&root.pictura_app);
@@ -161,7 +161,7 @@ test "sdl utils" {
             }
         }
 
-        fn release(key: u8, _: bool, _: bool, _: bool) void {
+        fn release(key: u8, _: i32, _: i32, _: i32) callconv(.c) void {
             if (key == 133) { // CTRL
                 grabbed = false;
                 release_mouse(root.pictura_app.window) catch {
@@ -182,7 +182,7 @@ test "sdl utils" {
             }
         }
 
-        fn move_window(px: f32, py: f32, nx: f32, ny: f32) void {
+        fn move_window(px: f32, py: f32, nx: f32, ny: f32) callconv(.c) void {
             // called on mouse movement
             if (grabbed) {
                 const dx: i32 = @intFromFloat(nx - px);

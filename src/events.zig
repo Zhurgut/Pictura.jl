@@ -21,34 +21,34 @@ pub const PAGEUP = 137;
 pub const PAGEDOWN = 138;
 pub const INSERT = 139;
 
-fn debug_mouse_pressed(x: f32, y: f32, button: u32) void {
+fn debug_mouse_pressed(x: f32, y: f32, button: u32) callconv(.c) void {
     std.debug.print("mouse button {d} pressed at ({d}, {d})\n", .{ button, x, y });
 }
 
-fn debug_mouse_released(x: f32, y: f32, button: u32) void {
+fn debug_mouse_released(x: f32, y: f32, button: u32) callconv(.c) void {
     std.debug.print("mouse button {d} released at ({d}, {d})\n", .{ button, x, y });
 }
 
-fn debug_mouse_wheel(vert: f32, hori: f32) void {
+fn debug_mouse_wheel(vert: f32, hori: f32) callconv(.c) void {
     std.debug.print("mouse wheel scrolled {d} vertically and {d} horizontally\n", .{ vert, hori });
 }
 
-fn debug_mouse_moved(x_prev: f32, y_prev: f32, x: f32, y: f32) void {
+fn debug_mouse_moved(x_prev: f32, y_prev: f32, x: f32, y: f32) callconv(.c) void {
     std.debug.print("moved mouse from ({d}, {d}) to ({d}, {d})\n", .{ x_prev, y_prev, x, y });
 }
 
-fn debug_mouse_dragged(x_prev: f32, y_prev: f32, x: f32, y: f32) void {
+fn debug_mouse_dragged(x_prev: f32, y_prev: f32, x: f32, y: f32) callconv(.c) void {
     std.debug.print("dragged mouse from ({d}, {d}) to ({d}, {d})\n", .{ x_prev, y_prev, x, y });
 }
 
-fn debug_key_pressed(key: u8, shift: i32, ctrl: i32, alt: i32) void {
+fn debug_key_pressed(key: u8, shift: i32, ctrl: i32, alt: i32) callconv(.c) void {
     const s = if (shift != 0) "+shift" else "";
     const c = if (ctrl != 0) "+ctrl" else "";
     const a = if (alt != 0) "+alt" else "";
     std.debug.print("key {c}{s}{s}{s} pressed\n", .{ if (key < 128) key else ' ', s, c, a });
 }
 
-fn debug_key_released(key: u8, shift: i32, ctrl: i32, alt: i32) void {
+fn debug_key_released(key: u8, shift: i32, ctrl: i32, alt: i32) callconv(.c) void {
     const s = if (shift != 0) "+shift" else "";
     const c = if (ctrl != 0) "+ctrl" else "";
     const a = if (alt != 0) "+alt" else "";
@@ -88,13 +88,13 @@ pub const Mouse = struct {
 
 pub const EventHandler = struct {
     mouse: Mouse,
-    mouse_pressed_fn: ?*const fn (x: f32, y: f32, button: u32) void = null,
-    mouse_released_fn: ?*const fn (x: f32, y: f32, button: u32) void = null,
-    mouse_wheel_fn: ?*const fn (vert: f32, hori: f32) void = null,
-    mouse_moved_fn: ?*const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) void = null,
-    mouse_dragged_fn: ?*const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) void = null,
-    key_pressed_fn: ?*const fn (key: u8, shift: i32, ctrl: i32, alt: i32) void = null,
-    key_released_fn: ?*const fn (key: u8, shift: i32, ctrl: i32, alt: i32) void = null,
+    mouse_pressed_fn: ?*const fn (x: f32, y: f32, button: u32) callconv(.c) void = null,
+    mouse_released_fn: ?*const fn (x: f32, y: f32, button: u32) callconv(.c) void = null,
+    mouse_wheel_fn: ?*const fn (vert: f32, hori: f32) callconv(.c) void = null,
+    mouse_moved_fn: ?*const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) callconv(.c) void = null,
+    mouse_dragged_fn: ?*const fn (x_prev: f32, y_prev: f32, x: f32, y: f32) callconv(.c) void = null,
+    key_pressed_fn: ?*const fn (key: u8, shift: i32, ctrl: i32, alt: i32) callconv(.c) void = null,
+    key_released_fn: ?*const fn (key: u8, shift: i32, ctrl: i32, alt: i32) callconv(.c) void = null,
 
     pub fn create() EventHandler {
         if (builtin.mode == .Debug) {
