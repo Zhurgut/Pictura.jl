@@ -24,6 +24,9 @@ pub const events = @import("events.zig");
 pub const sdl_utils = @import("sdl_utils.zig");
 pub const pipelines = @import("pipelines.zig");
 pub const exports = @import("exports.zig");
+comptime {
+    _ = exports;
+}
 
 pub var pictura_app: PicturaApp = undefined;
 
