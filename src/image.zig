@@ -5,7 +5,34 @@ const root = @import("root.zig");
 const vulkan = root.vulkan;
 const utils = root.utils;
 
-pub var format: vulkan.VkFormat = vulkan.VK_FORMAT_R8G8B8A8_UNORM; // the standart format for PicturaImages
+// the standart format for PicturaImages
+// when pixels are read from the cpu side, using a uint32_t*, they will always have the format 0xAABBGGRR
+pub var format: vulkan.VkFormat = vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+
+test "test format" {
+    const w = 200;
+    const h = 200;
+
+    try root.init._init(w, h, false);
+
+    var pictura_app = &root.pictura_app;
+
+    try draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, pictura_app);
+
+    try draw_point2(&pictura_app.canvas, 0 + 0.5, 0.5, 0.0, 0.0, 0.0, 1.0, 2.0, pictura_app); // a
+    try draw_point2(&pictura_app.canvas, 3 + 0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 2.0, pictura_app); // b
+    try draw_point2(&pictura_app.canvas, 6 + 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 2.0, pictura_app); // g
+    try draw_point2(&pictura_app.canvas, 9 + 0.5, 0.5, 1.0, 0.0, 0.0, 1.0, 2.0, pictura_app); // r
+
+    const pixels = try load_pixels(&pictura_app.canvas, pictura_app);
+
+    std.debug.assert(pixels[0] == 0xff000000); // a
+    std.debug.assert(pixels[3] == 0xffff0000); // b
+    std.debug.assert(pixels[6] == 0xff00ff00); // g
+    std.debug.assert(pixels[9] == 0xff0000ff); // r
+
+    root.init.quit();
+}
 
 pub const Op = enum {
     none,
