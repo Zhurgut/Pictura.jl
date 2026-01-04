@@ -101,7 +101,7 @@ pub const PicturaApp = struct {
             h,
             app.device,
             app.queue_family_index,
-            try utils.get_device_memory_index(app.physical_device),
+            app.physical_device,
         );
         errdefer new_canvas.destroy(app.device, app.descriptor_pool);
 
@@ -406,72 +406,46 @@ test "toy example" {
     const h = 600;
     try init._init(w, h, false);
 
-    try image.draw_background(&pictura_app.canvas, 0.0, 0.0, 0.0, 1.0, &pictura_app);
-    try pictura_app.swapchain.present(&pictura_app);
+    try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
-    try image.draw_background(&pictura_app.canvas, 0.1, 0.5, 0.9, 1.0, &pictura_app);
+    try image.draw_ellipse(
+        &pictura_app.canvas,
+        [4]f32{ 0.1, 0.2, 0.8, 0.9 },
+        [4]f32{ 0.6, 0.1, 0.6, 0.8 },
+        [2]f32{ 250, 102 },
+        4,
+        [2]f32{ 162.364, 327.396 - 200 },
+        [2]f32{ 690.5, 439.964 - 200 },
+        [2]f32{ 111.5, 566.036 - 200 },
+        [2]f32{ 639.636, 678.604 - 200 },
+        &pictura_app,
+    );
+
+    try image.draw_rect(
+        &pictura_app.canvas,
+        [4]f32{ 0.1, 0.6, 0.2, 0.9 },
+        [4]f32{ 0.6, 0.8, 0.2, 0.6 },
+        5,
+        450,
+        200,
+        20,
+        [2]f32{ 162.364, 327.396 - 20 },
+        [2]f32{ 690.5, 439.964 - 20 },
+        [2]f32{ 111.5, 566.036 - 20 },
+        [2]f32{ 639.636, 678.604 - 20 },
+        &pictura_app,
+    );
 
     const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
 
-    // on my pc aabbggrr
-    std.debug.print("pixels: {d}, {d}, {d}, {d}\n", .{ (pixels[0] >> 24) & 255, (pixels[0] >> 16) & 255, (pixels[0] >> 8) & 255, pixels[0] & 255 });
-
-    for (0..w * h) |i| {
-        const d: u32 = @as(u32, @intCast(i)) % 255;
-        const c: u32 = std.math.clamp(d, 0, 255);
-        pixels[i] = c | (c << 8) | (c << 16);
-    }
-
-    try image.update_pixels(&pictura_app.canvas, &pictura_app);
-
-    // try pictura_app.swapchain.present(&pictura_app);
+    var background: image.PicturaImage = try .from_pixels(w, h, pixels, &pictura_app);
 
     const start = sdl.SDL_GetTicksNS();
     while (pictura_app.running) {
         pictura_app.wait_until_next_frame();
         try pictura_app.event_handler.handle_events(&pictura_app);
-        try image.draw_background(&pictura_app.canvas, 1.0, 0.5, 0.1, 0.01, &pictura_app);
-        try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
-        // try image.draw_point2(
-        //     &pictura_app.canvas,
-        //     pictura_app.event_handler.mouse.x,
-        //     pictura_app.event_handler.mouse.y,
-        //     0.2,
-        //     0.1,
-        //     0.8,
-        //     1.0,
-        //     32,
-        //     &pictura_app,
-        // );
-
-        try image.draw_ellipse(
-            &pictura_app.canvas,
-            [4]f32{ 0.1, 0.2, 0.8, 0.9 },
-            [4]f32{ 0.6, 0.1, 0.6, 0.8 },
-            [2]f32{ 250, 102 },
-            4,
-            [2]f32{ 162.364, 327.396 - 200 },
-            [2]f32{ 690.5, 439.964 - 200 },
-            [2]f32{ 111.5, 566.036 - 200 },
-            [2]f32{ 639.636, 678.604 - 200 },
-            &pictura_app,
-        );
-
-        try image.draw_rect(
-            &pictura_app.canvas,
-            [4]f32{ 0.1, 0.6, 0.2, 0.9 },
-            [4]f32{ 0.6, 0.8, 0.2, 0.6 },
-            5,
-            450,
-            200,
-            20,
-            [2]f32{ 162.364, 327.396 - 20 },
-            [2]f32{ 690.5, 439.964 - 20 },
-            [2]f32{ 111.5, 566.036 - 20 },
-            [2]f32{ 639.636, 678.604 - 20 },
-            &pictura_app,
-        );
+        try image.copy_img(&pictura_app.canvas, &background, pictura_app.pipelines.copy_img_pipeline, &pictura_app);
 
         try image.draw_line(
             &pictura_app.canvas,
@@ -493,14 +467,15 @@ test "toy example" {
             std.debug.print("SHIFT!", .{});
         }
 
-        std.debug.print("framerate: {d}\n", .{exports.get_framerate()});
+        // std.debug.print("framerate: {d}\n", .{exports.get_framerate()});
 
         try pictura_app.swapchain.present(&pictura_app);
-        // sdl.SDL_Delay(10);
     }
     const stop = sdl.SDL_GetTicksNS();
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
+
     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
+    background.destroy(pictura_app.device, pictura_app.descriptor_pool);
 
     init.quit();
 }

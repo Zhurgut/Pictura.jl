@@ -66,7 +66,9 @@ pub const PicturaImage = struct {
     staging_buffer_memory: ?vulkan.VkDeviceMemory,
     pixels: ?[*]u32, // ptr to pixels in host memory
 
-    pub fn create(w: u32, h: u32, device: vulkan.VkDevice, queue_family_index: u32, memory_type_index: u32) !PicturaImage {
+    pub fn create(w: u32, h: u32, device: vulkan.VkDevice, queue_family_index: u32, physical_device: vulkan.VkPhysicalDevice) !PicturaImage {
+        const memory_type_index = try root.utils.get_device_memory_index(physical_device);
+
         const image = try utils.create_image(device, w, h, queue_family_index, format);
         errdefer vulkan.vkDestroyImage.?(device, image, null);
 
@@ -88,6 +90,18 @@ pub const PicturaImage = struct {
             .staging_buffer_memory = null,
             .pixels = null,
         };
+    }
+
+    pub fn from_pixels(w: u32, h: u32, srcpixels: [*]u32, app: *root.PicturaApp) !PicturaImage {
+        var image = try PicturaImage.create(w, h, app.device, app.queue_family_index, app.physical_device);
+        errdefer image.destroy(app.device, app.descriptor_pool);
+
+        var pixels = try load_pixels(&image, app);
+        @memcpy(pixels[0 .. w * h], srcpixels);
+
+        try update_pixels(&image, app);
+
+        return image;
     }
 
     pub fn get_copy_img_src_ds(

@@ -8,7 +8,7 @@ function get_constants(s)
 end
 
 function translate_constant(c)
-    return "#define $(c[:name]) $(c[:value]);\n"
+    return "#define $(c[:name]) $(c[:value])\n"
 end
 
 is_function_type(arg) = !isnothing(match(r"\*const fn", arg))
@@ -31,6 +31,8 @@ function translate_type(s)
         "void"
     elseif s == "callconv(.c) void"
         "void"
+    elseif s == "[*]u32"
+        "uint32_t*"
     elseif s == "?[*]u32"
         "uint32_t*"
     elseif s == "bool"

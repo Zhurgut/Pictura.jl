@@ -118,8 +118,7 @@ pub fn _init(w: u32, h: u32, hdpi: bool) !void {
 
     const pipelines = try root.pipelines.Pipelines.create(device, swapchain2.view_format);
 
-    const dev_mem = try utils.get_device_memory_index(physical_device);
-    var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, dev_mem);
+    var canvas = try image.PicturaImage.create(w, h, device, queue_family_index, physical_device);
     errdefer canvas.destroy(device, descriptor_pool);
 
     var numkeys: i32 = undefined;
