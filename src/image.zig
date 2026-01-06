@@ -10,6 +10,10 @@ const utils = root.utils;
 pub var format: vulkan.VkFormat = vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32;
 
 test "test format" {
+    if (!root.test_all) {
+        return;
+    }
+
     const w = 200;
     const h = 200;
 
@@ -37,7 +41,7 @@ test "test format" {
 pub const Op = enum {
     none,
     present,
-    copy_src,
+    sample_src,
     draw_dst,
     load_pixels,
     update_pixels,
@@ -47,7 +51,7 @@ pub fn get_access_and_stage(op: Op) struct { vulkan.VkImageLayout, vulkan.VkPipe
     return switch (op) {
         .none => .{ vulkan.VK_IMAGE_LAYOUT_UNDEFINED, vulkan.VK_PIPELINE_STAGE_2_NONE, vulkan.VK_ACCESS_2_NONE },
         .present => .{ vulkan.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, vulkan.VK_PIPELINE_STAGE_2_NONE, vulkan.VK_ACCESS_2_NONE },
-        .copy_src => .{ vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, vulkan.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT },
+        .sample_src => .{ vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, vulkan.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT },
         .draw_dst => .{ vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, vulkan.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | vulkan.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT },
         .load_pixels => .{ vulkan.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT, vulkan.VK_ACCESS_TRANSFER_READ_BIT },
         .update_pixels => .{ vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT, vulkan.VK_ACCESS_TRANSFER_WRITE_BIT },
@@ -60,7 +64,7 @@ pub const PicturaImage = struct {
     memory: ?vulkan.VkDeviceMemory,
     image: vulkan.VkImage,
     image_view: vulkan.VkImageView, // we always just need one view, we dont do anything fancy with these
-    copy_img_src_descriptor_set: ?vulkan.VkDescriptorSet,
+    sample_ds: ?vulkan.VkDescriptorSet,
     last_op: Op,
     staging_buffer: ?vulkan.VkBuffer,
     staging_buffer_memory: ?vulkan.VkDeviceMemory,
@@ -84,7 +88,7 @@ pub const PicturaImage = struct {
             .memory = memory,
             .image = image,
             .image_view = image_view,
-            .copy_img_src_descriptor_set = null,
+            .sample_ds = null,
             .last_op = .none,
             .staging_buffer = null,
             .staging_buffer_memory = null,
@@ -104,13 +108,13 @@ pub const PicturaImage = struct {
         return image;
     }
 
-    pub fn get_copy_img_src_ds(
+    pub fn get_sample_ds(
         pimage: *PicturaImage,
         device: vulkan.VkDevice,
         d_pool: vulkan.VkDescriptorPool,
         pipelines: *root.pipelines.Pipelines,
     ) !vulkan.VkDescriptorSet {
-        if (pimage.copy_img_src_descriptor_set) |set| {
+        if (pimage.sample_ds) |set| {
             return set;
         }
 
@@ -119,7 +123,7 @@ pub const PicturaImage = struct {
             .pNext = null,
             .descriptorPool = d_pool,
             .descriptorSetCount = 1,
-            .pSetLayouts = &pipelines.copy_img_src_descriptor_set_layout,
+            .pSetLayouts = &pipelines.sample_ds_layout,
         };
         var set: vulkan.VkDescriptorSet = undefined;
         const result = vulkan.vkAllocateDescriptorSets.?(device, &info, &set);
@@ -129,7 +133,7 @@ pub const PicturaImage = struct {
         }
 
         const image_info: vulkan.VkDescriptorImageInfo = .{
-            .sampler = pipelines.copy_img_src_sampler,
+            .sampler = pipelines.nearest_sampler,
             .imageView = pimage.image_view,
             .imageLayout = vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
@@ -143,7 +147,7 @@ pub const PicturaImage = struct {
 
         vulkan.vkUpdateDescriptorSets.?(device, 1, &write_ds, 0, null); // never update it again!
 
-        pimage.copy_img_src_descriptor_set = set;
+        pimage.sample_ds = set;
 
         return set;
     }
@@ -212,7 +216,7 @@ pub const PicturaImage = struct {
             vulkan.vkDestroyBuffer.?(device, buf, null);
         }
 
-        if (pimage.copy_img_src_descriptor_set) |ds| {
+        if (pimage.sample_ds) |ds| {
             const result = vulkan.vkFreeDescriptorSets.?(device, descriptor_pool, 1, &ds);
 
             if (result != vulkan.VK_SUCCESS) {
@@ -224,7 +228,7 @@ pub const PicturaImage = struct {
         pimage.pixels = null;
         pimage.staging_buffer_memory = null;
         pimage.staging_buffer = null;
-        pimage.copy_img_src_descriptor_set = null;
+        pimage.sample_ds = null;
 
         vulkan.vkDestroyImageView.?(device, pimage.image_view, null);
         if (pimage.memory) |mem| {
@@ -258,7 +262,7 @@ fn set_viewport_and_scissor(w: u32, h: u32, command_buffer: vulkan.VkCommandBuff
 pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
     var command_buffer = try app.well.record(app.device);
 
-    var src_barrier = utils.get_image_memory_barrier(src, .copy_src, app.queue_family_index);
+    var src_barrier = utils.get_image_memory_barrier(src, .sample_src, app.queue_family_index);
     utils.submit_image_memory_barrier(command_buffer, &src_barrier);
 
     var dst_barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
@@ -268,7 +272,7 @@ pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipel
 
     vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-    var descriptor_set = try src.get_copy_img_src_ds(
+    var descriptor_set = try src.get_sample_ds(
         app.device,
         app.descriptor_pool,
         &app.pipelines,
@@ -556,4 +560,106 @@ pub fn draw_rect(
     vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_rect_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, @sizeOf(@TypeOf(quad_pcs)), @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
 
     vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
+}
+
+pub fn mix_channels(
+    dst_image: *PicturaImage,
+    src_image: *PicturaImage,
+    red_amounts: [4]f32,
+    grn_amounts: [4]f32,
+    blu_amounts: [4]f32,
+    alpha_amounts: [4]f32,
+    offsets: [4]f32,
+    app: *root.PicturaApp,
+) !void {
+    if (src_image == dst_image) {
+        return error.src_cant_equal_dst;
+    }
+
+    var command_buffer = try app.well.record(app.device);
+
+    var src_barrier = utils.get_image_memory_barrier(src_image, .sample_src, app.queue_family_index);
+    utils.submit_image_memory_barrier(command_buffer, &src_barrier);
+
+    var dst_barrier = utils.get_image_memory_barrier(dst_image, .draw_dst, app.queue_family_index);
+    command_buffer = try app.well.render_into(dst_image, &dst_barrier, app.device);
+
+    set_viewport_and_scissor(dst_image.w, dst_image.h, command_buffer);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.mix1_pipeline);
+
+    var descriptor_set = try src_image.get_sample_ds(
+        app.device,
+        app.descriptor_pool,
+        &app.pipelines,
+    );
+
+    vulkan.vkCmdBindDescriptorSets.?(
+        command_buffer,
+        vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS,
+        app.pipelines.mix1_pipeline_layout,
+        0,
+        1,
+        &descriptor_set,
+        0,
+        null,
+    );
+
+    const frag_pcs = red_amounts ++ grn_amounts ++ blu_amounts ++ alpha_amounts ++ offsets;
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.mix1_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, 0, @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
+
+    vulkan.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
+}
+
+pub fn mix_channels2(
+    dst_image: *PicturaImage,
+    src_image: *PicturaImage,
+    red_amounts: [4]f32,
+    grn_amounts: [4]f32,
+    blu_amounts: [4]f32,
+    max_amounts: [4]f32,
+    min_amounts: [4]f32,
+    mid_amounts: [4]f32,
+    rdm_amounts: [3]f32,
+    seed: f32,
+    offsets: [4]f32,
+    app: *root.PicturaApp,
+) !void {
+    if (src_image == dst_image) {
+        return error.src_cant_equal_dst;
+    }
+
+    var command_buffer = try app.well.record(app.device);
+
+    var src_barrier = utils.get_image_memory_barrier(src_image, .sample_src, app.queue_family_index);
+    utils.submit_image_memory_barrier(command_buffer, &src_barrier);
+
+    var dst_barrier = utils.get_image_memory_barrier(dst_image, .draw_dst, app.queue_family_index);
+    command_buffer = try app.well.render_into(dst_image, &dst_barrier, app.device);
+
+    set_viewport_and_scissor(dst_image.w, dst_image.h, command_buffer);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.mix2_pipeline);
+
+    var descriptor_set = try src_image.get_sample_ds(
+        app.device,
+        app.descriptor_pool,
+        &app.pipelines,
+    );
+
+    vulkan.vkCmdBindDescriptorSets.?(
+        command_buffer,
+        vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS,
+        app.pipelines.mix2_pipeline_layout,
+        0,
+        1,
+        &descriptor_set,
+        0,
+        null,
+    );
+
+    const frag_pcs = red_amounts ++ grn_amounts ++ blu_amounts ++ max_amounts ++ min_amounts ++ mid_amounts ++ rdm_amounts ++ [1]f32{seed} ++ offsets;
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.mix2_pipeline_layout, vulkan.VK_SHADER_STAGE_FRAGMENT_BIT, 0, @sizeOf(@TypeOf(frag_pcs)), &frag_pcs);
+
+    vulkan.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
 }

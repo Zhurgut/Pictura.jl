@@ -7,8 +7,8 @@ const shaders = root.shaders;
 const image = root.image;
 
 pub const Pipelines = struct {
-    copy_img_src_sampler: vulkan.VkSampler,
-    copy_img_src_descriptor_set_layout: vulkan.VkDescriptorSetLayout,
+    nearest_sampler: vulkan.VkSampler,
+    sample_ds_layout: vulkan.VkDescriptorSetLayout,
     copy_img_pipeline_layout: vulkan.VkPipelineLayout,
 
     swapchain_copy_img_pipeline: vulkan.VkPipeline,
@@ -28,6 +28,12 @@ pub const Pipelines = struct {
 
     draw_rect_pipeline_layout: vulkan.VkPipelineLayout,
     draw_rect_pipeline: vulkan.VkPipeline,
+
+    mix1_pipeline_layout: vulkan.VkPipelineLayout,
+    mix1_pipeline: vulkan.VkPipeline,
+
+    mix2_pipeline_layout: vulkan.VkPipelineLayout,
+    mix2_pipeline: vulkan.VkPipeline,
 
     pub fn create(device: vulkan.VkDevice, swapchain_img_format: vulkan.VkFormat) !Pipelines {
         var out: Pipelines = undefined;
@@ -68,17 +74,29 @@ pub const Pipelines = struct {
             .size = 12 * @sizeOf(f32),
         };
 
+        var mix1_pcr: vulkan.VkPushConstantRange = .{
+            .stageFlags = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset = 0,
+            .size = 20 * @sizeOf(f32),
+        };
+
+        var mix2_pcr: vulkan.VkPushConstantRange = .{
+            .stageFlags = vulkan.VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset = 0,
+            .size = 32 * @sizeOf(f32),
+        };
+
         //
         // copy image
         //
 
-        out.copy_img_src_sampler = try sampler(device);
-        errdefer vulkan.vkDestroySampler.?(device, out.copy_img_src_sampler, null);
+        out.nearest_sampler = try sampler(device);
+        errdefer vulkan.vkDestroySampler.?(device, out.nearest_sampler, null);
 
-        out.copy_img_src_descriptor_set_layout = try copy_img_src_descriptor_set_layout(device);
-        errdefer vulkan.vkDestroyDescriptorSetLayout.?(device, out.copy_img_src_descriptor_set_layout, null);
+        out.sample_ds_layout = try sample_descriptor_set_layout(device);
+        errdefer vulkan.vkDestroyDescriptorSetLayout.?(device, out.sample_ds_layout, null);
 
-        out.copy_img_pipeline_layout = try copy_img_pipeline_layout(device, &out.copy_img_src_descriptor_set_layout);
+        out.copy_img_pipeline_layout = try copy_img_pipeline_layout(device, &out.sample_ds_layout);
         errdefer vulkan.vkDestroyPipelineLayout.?(device, out.copy_img_pipeline_layout, null);
 
         out.swapchain_copy_img_pipeline = try utils.two_stage_graphics_pipeline(
@@ -162,10 +180,34 @@ pub const Pipelines = struct {
         errdefer vulkan.vkDestroyPipelineLayout.?(device, out.draw_rect_pipeline_layout, null);
         errdefer vulkan.vkDestroyPipeline.?(device, out.draw_rect_pipeline, null);
 
+        out.mix1_pipeline_layout, out.mix1_pipeline = try mix_channels_pipeline(
+            device,
+            shaders.modules.mix_channels,
+            &out.sample_ds_layout,
+            &mix1_pcr,
+        );
+        errdefer vulkan.vkDestroyPipelineLayout.?(device, out.mix1_pipeline_layout, null);
+        errdefer vulkan.vkDestroyPipeline.?(device, out.mix1_pipeline, null);
+
+        out.mix2_pipeline_layout, out.mix2_pipeline = try mix_channels_pipeline(
+            device,
+            shaders.modules.mix_channels2,
+            &out.sample_ds_layout,
+            &mix2_pcr,
+        );
+        errdefer vulkan.vkDestroyPipelineLayout.?(device, out.mix2_pipeline_layout, null);
+        errdefer vulkan.vkDestroyPipeline.?(device, out.mix2_pipeline, null);
+
         return out;
     }
 
     pub fn destroy(pipelines: *Pipelines, device: vulkan.VkDevice) void {
+        vulkan.vkDestroyPipeline.?(device, pipelines.mix2_pipeline, null);
+        vulkan.vkDestroyPipelineLayout.?(device, pipelines.mix2_pipeline_layout, null);
+
+        vulkan.vkDestroyPipeline.?(device, pipelines.mix1_pipeline, null);
+        vulkan.vkDestroyPipelineLayout.?(device, pipelines.mix1_pipeline_layout, null);
+
         vulkan.vkDestroyPipeline.?(device, pipelines.draw_rect_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.draw_rect_pipeline_layout, null);
 
@@ -184,8 +226,8 @@ pub const Pipelines = struct {
         vulkan.vkDestroyPipeline.?(device, pipelines.swapchain_copy_img_pipeline, null);
         vulkan.vkDestroyPipeline.?(device, pipelines.copy_img_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.copy_img_pipeline_layout, null);
-        vulkan.vkDestroyDescriptorSetLayout.?(device, pipelines.copy_img_src_descriptor_set_layout, null);
-        vulkan.vkDestroySampler.?(device, pipelines.copy_img_src_sampler, null);
+        vulkan.vkDestroyDescriptorSetLayout.?(device, pipelines.sample_ds_layout, null);
+        vulkan.vkDestroySampler.?(device, pipelines.nearest_sampler, null);
     }
 };
 
@@ -206,7 +248,7 @@ fn sampler(device: vulkan.VkDevice) !vulkan.VkSampler {
     return nearest_sampler;
 }
 
-fn copy_img_src_descriptor_set_layout(device: vulkan.VkDevice) !vulkan.VkDescriptorSetLayout {
+fn sample_descriptor_set_layout(device: vulkan.VkDevice) !vulkan.VkDescriptorSetLayout {
     const sampler_binding: vulkan.VkDescriptorSetLayoutBinding = .{
         .binding = 0,
         .descriptorType = vulkan.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -297,6 +339,40 @@ fn draw_shape_pipeline(
         fragshader,
         pipeline_layout,
         vulkan.VK_TRUE,
+    );
+
+    return .{ pipeline_layout, pipeline };
+}
+
+fn mix_channels_pipeline(
+    device: vulkan.VkDevice,
+    fragshader: vulkan.VkShaderModule,
+    ds_layout: *vulkan.VkDescriptorSetLayout,
+    frag_pcr: *vulkan.VkPushConstantRange,
+) !struct { vulkan.VkPipelineLayout, vulkan.VkPipeline } {
+    var pipeline_layout_info = std.mem.zeroes(vulkan.VkPipelineLayoutCreateInfo);
+    pipeline_layout_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = ds_layout;
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges = frag_pcr;
+
+    var pipeline_layout: vulkan.VkPipelineLayout = undefined;
+
+    const result = vulkan.vkCreatePipelineLayout.?(device, &pipeline_layout_info, null, &pipeline_layout);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create pipeline layout: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_pipeline_layout;
+    }
+    errdefer vulkan.vkDestroyPipelineLayout.?(device, pipeline_layout, null);
+
+    const pipeline = try utils.two_stage_graphics_pipeline(
+        device,
+        image.format,
+        shaders.modules.fullscreen,
+        fragshader,
+        pipeline_layout,
+        vulkan.VK_FALSE,
     );
 
     return .{ pipeline_layout, pipeline };

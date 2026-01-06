@@ -401,7 +401,9 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-test "toy example" {
+pub const test_all: bool = false;
+
+test "main test example" {
     const w = 800;
     const h = 600;
     try init._init(w, h, false);
@@ -439,6 +441,36 @@ test "toy example" {
     const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
 
     var background: image.PicturaImage = try .from_pixels(w, h, pixels, &pictura_app);
+
+    try image.mix_channels(
+        &background,
+        &pictura_app.canvas,
+
+        [4]f32{ 0.21, 0.21, 0.21, 0 }, // how much of red to put in each location
+        [4]f32{ 0.72, 0.72, 0.72, 0 }, // ...
+        [4]f32{ 0.07, 0.07, 0.07, 0 },
+        [4]f32{ 0, 0, 0, 0 },
+        [4]f32{ 0, 0, 0, 0.5 },
+        &pictura_app,
+    );
+    const bg_pixels = try image.load_pixels(&background, &pictura_app);
+    std.debug.assert(127 == (bg_pixels[0] & 0xff000000) >> 24);
+
+    try image.mix_channels2(
+        &background,
+        &pictura_app.canvas,
+
+        [4]f32{ 0.21 * 0.8, 0.21 * 0.8, 0.21 * 0.8, 0 },
+        [4]f32{ 0.72 * 0.8, 0.72 * 0.8, 0.72 * 0.8, 0 },
+        [4]f32{ 0.07 * 0.8, 0.07 * 0.8, 0.07 * 0.8, 0 },
+        [4]f32{ 0.2, 0, 0, 0 },
+        [4]f32{ 0, 0.2, 0, 0 },
+        [4]f32{ 0, 0, 0.2, 0 },
+        [3]f32{ 0.1, 0.1, 0.1 },
+        0.123,
+        [4]f32{ -0.05, -0.05, -0.05, 1 },
+        &pictura_app,
+    );
 
     const start = sdl.SDL_GetTicksNS();
     while (pictura_app.running) {
