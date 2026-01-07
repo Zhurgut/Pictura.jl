@@ -18,14 +18,9 @@ layout(set = 0, binding = 0) uniform sampler2D the_texture;
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 out_color;
 
-const float PHI = 1.61803398874989484820459; // Φ = Golden Ratio 
-
-float gold_noise(in vec2 xy, in float seed) {
-return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
-}
 
 float rand(vec2 uv, float seed) {
-    return fract(sin(dot(uv + seed, vec2(12.9898, 78.233))) * 43758.5453123); // double check
+    return fract(sin(dot(uv + seed, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
 
