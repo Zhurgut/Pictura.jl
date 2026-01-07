@@ -13,8 +13,8 @@ pub export fn init(w: u32, h: u32, hdpi: i32) u32 {
     return 0;
 }
 
-pub export fn get_framerate() f64 {
-    return 1e9 / @as(f64, @floatFromInt(root.pictura_app.last_frame_time - root.pictura_app.before_last_time));
+pub export fn get_frametime() f64 {
+    return 1e-9 * @as(f64, @floatFromInt(root.pictura_app.last_frame_time - root.pictura_app.before_last_time));
 }
 
 pub export fn set_framerate(f: f64) f64 {
@@ -61,16 +61,31 @@ pub export fn quit() void {
 }
 
 pub export fn create_image(w: u32, h: u32) ?*const anyopaque {
-    const mem_index = root.utils.get_device_memory_index(root.pictura_app.physical_device) catch {
-        return null;
-    };
-
     const image = root.image.PicturaImage.create(
         w,
         h,
         root.pictura_app.device,
         root.pictura_app.queue_family_index,
-        mem_index,
+        root.pictura_app.physical_device,
+    ) catch {
+        return null;
+    };
+
+    const image_ptr = root.pictura_app.gpa.create(root.image.PicturaImage) catch {
+        return null;
+    };
+
+    image_ptr.* = image;
+
+    return image_ptr;
+}
+
+pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?*const anyopaque {
+    const image = root.image.PicturaImage.from_pixels(
+        w,
+        h,
+        srcpixels,
+        &root.pictura_app,
     ) catch {
         return null;
     };

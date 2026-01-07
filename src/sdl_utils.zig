@@ -135,6 +135,10 @@ pub fn set_mouse_position(window: *sdl.SDL_Window, x: f32, y: f32) void {
 }
 
 test "sdl utils" {
+    if (!root.test_all) {
+        return;
+    }
+
     const Tester = struct {
         var grabbed: bool = false;
         var x: f32 = 0.0;

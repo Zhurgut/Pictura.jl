@@ -35,11 +35,12 @@ float parabola(float x) {
     return fma(fma(pc.parabola_A, x, pc.parabola_B), x, pc.parabola_C);
 }
 
+// output the color which is required to get the same result as if fill was drawn first, and then stroke
 vec4 blend(vec4 dst, vec4 src) {
-    vec4 src2 = vec4(src.rgb, 1.0);
-    return mix(dst, src2, src.a);
+    float A = dst.a + src.a - dst.a*src.a;
+    vec3 B = mix(dst.a * dst.rgb, src.rgb, src.a) / (A + 1e-6);
+    return vec4(B, A);
 }
-
 
 void main() {
 

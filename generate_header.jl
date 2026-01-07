@@ -8,7 +8,7 @@ function get_constants(s)
 end
 
 function translate_constant(c)
-    return "#define $(c[:name]) $(c[:value]);\n"
+    return "#define $(c[:name]) $(c[:value])\n"
 end
 
 is_function_type(arg) = !isnothing(match(r"\*const fn", arg))
@@ -22,15 +22,17 @@ function translate_type(s)
     elseif s == "[*:0]const u8"
         "const char*"
     elseif s == "*const anyopaque"
-        "void*"
+        "Image"
     elseif s == "?*const anyopaque"
-        "void*"
+        "Image"
     elseif s == "*anyopaque"
-        "void*"
+        "Image"
     elseif s == "void"
         "void"
     elseif s == "callconv(.c) void"
         "void"
+    elseif s == "[*]u32"
+        "uint32_t*"
     elseif s == "?[*]u32"
         "uint32_t*"
     elseif s == "bool"
@@ -100,15 +102,18 @@ function main()
     constants = get_constants(sin)
     
 
-    out = open("zig-out/lib/pictura.h", "w")
+    out = open("zig-out/lib/picturalib.h", "w")
     write(out, "#ifndef PICTURALIBH\n#define PICTURALIBH\n\n")
     write(out, "#include <inttypes.h>\n\n")
-
+    
+    
     for c in constants
         write(out, translate_constant(c))
     end
 
     write(out, "\n")
+
+    write(out, "typedef void* Image;\n\n")
 
     for f in functions
         write(out, translate_function(f))
