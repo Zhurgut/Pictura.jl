@@ -1,6 +1,8 @@
 const std = @import("std");
 const root = @import("root.zig");
 
+const Image = *anyopaque;
+
 // convert zig errors to strings :)
 pub export fn error_string(err: u32) [*:0]const u8 {
     return @errorName(@errorFromInt(@as(u16, @intCast(err))));
@@ -23,11 +25,11 @@ pub export fn set_framerate(f: f64) f64 {
     return root.pictura_app.target_framerate;
 }
 
-pub export fn get_canvas() *const anyopaque {
+pub export fn get_canvas() Image {
     return &root.pictura_app.canvas;
 }
 
-pub export fn draw_background(image: *anyopaque, r: f32, g: f32, b: f32, a: f32) u32 {
+pub export fn draw_background(image: Image, r: f32, g: f32, b: f32, a: f32) u32 {
     root.image.draw_background(@ptrCast(@alignCast(image)), r, g, b, a, &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
@@ -60,7 +62,7 @@ pub export fn quit() void {
     root.init.quit();
 }
 
-pub export fn create_image(w: u32, h: u32) ?*const anyopaque {
+pub export fn create_image(w: u32, h: u32) ?Image {
     const image = root.image.PicturaImage.create(
         w,
         h,
@@ -80,7 +82,7 @@ pub export fn create_image(w: u32, h: u32) ?*const anyopaque {
     return image_ptr;
 }
 
-pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?*const anyopaque {
+pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?Image {
     const image = root.image.PicturaImage.from_pixels(
         w,
         h,
@@ -99,28 +101,28 @@ pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?*cons
     return image_ptr;
 }
 
-pub export fn destroy_image(image: *anyopaque) void {
+pub export fn destroy_image(image: Image) void {
     var pimage: *root.image.PicturaImage = @ptrCast(@alignCast(image));
     pimage.destroy(root.pictura_app.device, root.pictura_app.descriptor_pool);
 
     root.pictura_app.gpa.destroy(pimage);
 }
 
-pub export fn load_pixels(image: *anyopaque) ?[*]u32 {
+pub export fn load_pixels(image: Image) ?[*]u32 {
     const pixels = root.image.load_pixels(@ptrCast(@alignCast(image)), &root.pictura_app) catch {
         return null;
     };
     return pixels;
 }
 
-pub export fn update_pixels(image: *anyopaque) u32 {
+pub export fn update_pixels(image: Image) u32 {
     root.image.update_pixels(@ptrCast(@alignCast(image)), &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn draw_point(image: *anyopaque, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32, stroke_radius: f32) u32 {
+pub export fn draw_point(image: Image, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32, stroke_radius: f32) u32 {
     root.image.draw_point2(@ptrCast(@alignCast(image)), x, y, r, g, b, a, stroke_radius, &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
@@ -128,7 +130,7 @@ pub export fn draw_point(image: *anyopaque, x: f32, y: f32, r: f32, g: f32, b: f
 }
 
 pub export fn draw_line(
-    image: *anyopaque,
+    image: Image,
     x1: f32,
     y1: f32,
     x2: f32,
@@ -165,7 +167,7 @@ pub export fn draw_line(
 }
 
 pub export fn draw_ellipse(
-    image: *anyopaque,
+    image: Image,
     radius_x: f32,
     radius_y: f32,
     fill_r: f32,
@@ -222,7 +224,7 @@ pub export fn draw_ellipse(
 }
 
 pub export fn draw_rect(
-    image: *anyopaque,
+    image: Image,
     w: f32,
     h: f32,
     corner_radius: f32,
@@ -405,4 +407,57 @@ pub export fn release_mouse() u32 {
         return @intFromError(e);
     };
     return 0;
+}
+
+//
+// Vulkan exports for the power users:)
+//
+pub export fn get_vk_instance() root.vulkan.VkInstance {
+    return root.pictura_app.instance;
+}
+pub export fn get_vk_physical_device() root.vulkan.VkPhysicalDevice {
+    return root.pictura_app.physical_device;
+}
+pub export fn get_vk_device() root.vulkan.VkDevice {
+    return root.pictura_app.device;
+}
+pub export fn get_vk_queue_family_index() u32 {
+    return root.pictura_app.queue_family_index;
+}
+pub export fn get_vk_queue() root.vulkan.VkQueue {
+    return root.pictura_app.queue;
+}
+
+pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) u32 {
+    const bf = root.pictura_app.well.record(root.pictura_app.device) catch |e| {
+        return @intFromError(e);
+    };
+    out.* = bf;
+    return 0;
+}
+
+// already called begin rendering and did the memory barrier for the render target image
+// no need to call end rendering yerself, just call present()
+pub export fn get_vk_command_buffer_with_render_target(out: *root.vulkan.VkCommandBuffer, image: Image) u32 {
+    const dst: *root.image.PicturaImage = @ptrCast(@alignCast(image));
+
+    // the user cannot access image internals, so the barrier that gets generated here is correct (the user cannot do their own diy vulkan reading and writing from/to the texture)
+    var barrier = root.utils.get_image_memory_barrier(dst, .draw_dst, root.pictura_app.queue_family_index);
+
+    const bf = root.pictura_app.well.render_into(dst, &barrier, root.pictura_app.device) catch |e| {
+        return @intFromError(e);
+    };
+
+    out.* = bf;
+    return 0;
+}
+
+// for no performance compromise :)
+pub export fn get_vk_proc_addr(fn_name: [*:0]const u8) root.vulkan.PFN_vkVoidFunction {
+    return @ptrCast(root.vulkan.vkGetDeviceProcAddr.?(root.pictura_app.device, fn_name));
+}
+
+// for completeness
+pub export fn get_vk_instance_proc_addr(fn_name: [*:0]const u8) root.vulkan.PFN_vkVoidFunction {
+    return @ptrCast(root.vulkan.vkGetInstanceProcAddr.?(root.pictura_app.instance, fn_name));
 }
