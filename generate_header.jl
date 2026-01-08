@@ -17,15 +17,25 @@ is_function_type(arg) = !isnothing(match(r"\*const fn", arg))
 function translate_type(s)
     return if s == "u32"
         "uint32_t"
+    elseif s == "root.vulkan.PFN_vkVoidFunction"
+        "PFN_vkVoidFunction"
+    elseif s == "root.vulkan.VkInstance"
+        "VkInstance"
+    elseif s == "root.vulkan.VkPhysicalDevice"
+        "VkPhysicalDevice"
+    elseif s == "root.vulkan.VkDevice"
+        "VkDevice"
+    elseif s == "root.vulkan.VkQueue"
+        "VkQueue"
+    elseif s == "*root.vulkan.VkCommandBuffer"
+        "VkCommandBuffer*"
     elseif s == "i32"
         "int32_t"
     elseif s == "[*:0]const u8"
         "const char*"
-    elseif s == "*const anyopaque"
+    elseif s == "Image"
         "Image"
-    elseif s == "?*const anyopaque"
-        "Image"
-    elseif s == "*anyopaque"
+    elseif s == "?Image"
         "Image"
     elseif s == "void"
         "void"
@@ -104,6 +114,7 @@ function main()
 
     out = open("zig-out/lib/picturalib.h", "w")
     write(out, "#ifndef PICTURALIBH\n#define PICTURALIBH\n\n")
+    write(out, """#include "vulkan/volk.h"\n""")
     write(out, "#include <inttypes.h>\n\n")
     
     
