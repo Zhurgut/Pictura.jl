@@ -20,14 +20,15 @@
     }\
 })
 
-VkResult create_instance_and_physical_device(
-        uint32_t nr_inst_extensions, const char* const* vk_inst_extensions, 
-        VkInstance* pInstance, VkPhysicalDevice* pPhysicalDevice);
+VkResult create_instance(VkInstance* p_instance, uint32_t nr_extensions, const char* const* vk_extensions, uint32_t nr_layers, const char* const* layers);
+
+VkResult create_physical_device(VkPhysicalDevice* p_physical_device, uint32_t device_index, VkInstance instance);
 
 VkResult create_device(
-        VkPhysicalDevice physical_device,
-        VkDevice* pDevice, uint32_t* pQueue_family_index, 
-        uint32_t nr_extensions, const char* const *extensions);
+    VkDevice* p_device, uint32_t* p_queue_family_index, 
+    VkPhysicalDevice physical_device,
+    uint32_t nr_extensions, const char* const *extensions,
+    void* features);
 
 
 #endif 
