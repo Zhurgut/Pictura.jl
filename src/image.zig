@@ -17,7 +17,7 @@ test "test format" {
     const w = 200;
     const h = 200;
 
-    try root.init.init(w, h, false);
+    try root.init.init(w, h);
 
     var pictura_app = &root.pictura_app;
 

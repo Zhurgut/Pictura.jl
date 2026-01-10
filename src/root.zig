@@ -401,12 +401,12 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-pub const test_all: bool = false;
+pub const test_all: bool = true;
 
 test "main test example" {
     const w = 800;
     const h = 600;
-    try init.init(w, h, false);
+    try init.init(w, h);
 
     try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
