@@ -9,7 +9,7 @@
 
 
 
-VkResult create_instance(VkInstance* p_instance, uint32_t nr_extensions, const char* const* vk_extensions) {
+VkResult create_instance(VkInstance* p_instance, uint32_t nr_extensions, const char* const* vk_extensions, uint32_t nr_layers, const char* const* layers) {
 
     VkResult result = volkInitialize();
     CHECK_ELSE_RETURN(result, "volk initialization failed");
@@ -37,7 +37,7 @@ VkResult create_instance(VkInstance* p_instance, uint32_t nr_extensions, const c
 VkResult create_physical_device(VkPhysicalDevice* p_physical_device, uint32_t device_index, VkInstance instance) {
 
     uint32_t nr_devices;
-    result = vkEnumeratePhysicalDevices(instance, &nr_devices, NULL);
+    VkResult result = vkEnumeratePhysicalDevices(instance, &nr_devices, NULL);
     CHECK_ELSE_RETURN(result, "failed to get number of devices");
 
     if (device_index >= nr_devices) {
@@ -54,6 +54,7 @@ VkResult create_physical_device(VkPhysicalDevice* p_physical_device, uint32_t de
 }
 
 
+// TODO check device (and instance?) can handle API version 1.3 
 
 VkResult create_device(
         VkDevice* p_device, uint32_t* p_queue_family_index, 
