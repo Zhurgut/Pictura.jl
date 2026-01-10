@@ -428,6 +428,46 @@ pub export fn get_vk_queue() root.vulkan.VkQueue {
     return root.pictura_app.queue;
 }
 
+pub export fn init2(
+    w: u32,
+    h: u32,
+    nr_instance_extensions: u32,
+    instance_extensions: ?[*][*:0]const u8,
+    nr_vk_layers: u32,
+    vulkan_layers: ?[*][*:0]const u8,
+    features: ?*anyopaque,
+    nr_device_extensions: u32,
+    device_extensions: ?[*][*:0]const u8,
+) u32 {
+    const inst_ext = if (instance_extensions != null and nr_instance_extensions != 0)
+        instance_extensions.?[0..nr_instance_extensions]
+    else
+        null;
+
+    const layers = if (vulkan_layers != null and nr_vk_layers != 0)
+        vulkan_layers.?[0..nr_vk_layers]
+    else
+        null;
+
+    const dev_ext = if (device_extensions != null and nr_device_extensions != 0)
+        device_extensions.?[0..nr_device_extensions]
+    else
+        null;
+
+    root.init.init2(
+        w,
+        h,
+        inst_ext,
+        layers,
+        features,
+        dev_ext,
+    ) catch |e| {
+        return @intFromError(e);
+    };
+
+    return 0;
+}
+
 pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) u32 {
     const bf = root.pictura_app.well.record(root.pictura_app.device) catch |e| {
         return @intFromError(e);

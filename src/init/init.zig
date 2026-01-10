@@ -236,12 +236,19 @@ pub fn init_app(
     };
 }
 
-pub fn init(w: u32, h: u32) !void {
+pub fn init2(
+    w: u32,
+    h: u32,
+    instance_extensions: ?[][*:0]const u8,
+    vulkan_layers: ?[][*:0]const u8,
+    features: ?*anyopaque,
+    device_extensions: ?[][*:0]const u8,
+) !void {
     const window, const instance = try create_window_and_vkinstance(
         w,
         h,
-        null,
-        null,
+        instance_extensions,
+        vulkan_layers,
     );
     errdefer sdl.SDL_Quit();
     errdefer sdl.SDL_DestroyWindow(window);
@@ -250,8 +257,8 @@ pub fn init(w: u32, h: u32) !void {
     const physical_device, const device, const queue_family_index = try create_device(
         instance,
         0,
-        null,
-        null,
+        features,
+        device_extensions,
     );
     errdefer vulkan.vkDestroyDevice.?(device, null);
 
@@ -275,6 +282,10 @@ pub fn init(w: u32, h: u32) !void {
     errdefer root.pictura_app.arena.deinit();
 
     return;
+}
+
+pub fn init(w: u32, h: u32) !void {
+    try init2(w, h, null, null, null, null);
 }
 
 pub fn quit() void {
