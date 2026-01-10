@@ -83,10 +83,11 @@ pub fn get_device_memory_index(physical_device: vulkan.VkPhysicalDevice, req_bit
     var properties: vulkan.VkPhysicalDeviceMemoryProperties = undefined;
     vulkan.vkGetPhysicalDeviceMemoryProperties.?(physical_device, &properties);
 
-    for (properties.memoryTypes[0..properties.memoryHeapCount], 0..) |mem_type, i| {
+    for (properties.memoryTypes[0..properties.memoryTypeCount], 0..) |mem_type, i| {
         if (b == 0) {
             break;
         }
+
         if (((b & 0x1) != 0) and mem_type.propertyFlags == vulkan.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
             return @intCast(i);
         }
@@ -94,7 +95,7 @@ pub fn get_device_memory_index(physical_device: vulkan.VkPhysicalDevice, req_bit
     }
 
     b = req_bits;
-    for (properties.memoryTypes[0..properties.memoryHeapCount], 0..) |mem_type, i| {
+    for (properties.memoryTypes[0..properties.memoryTypeCount], 0..) |mem_type, i| {
         if (b == 0) {
             break;
         }
@@ -107,7 +108,7 @@ pub fn get_device_memory_index(physical_device: vulkan.VkPhysicalDevice, req_bit
     std.debug.print("didnt find device local memory for image\n", .{});
 
     b = req_bits;
-    for (properties.memoryTypes[0..properties.memoryHeapCount], 0..) |_, i| {
+    for (properties.memoryTypes[0..properties.memoryTypeCount], 0..) |_, i| {
         if (b == 0) {
             break;
         }
