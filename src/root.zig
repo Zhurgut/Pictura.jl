@@ -401,7 +401,7 @@ fn WellOfCommands2(comptime n: u32) type {
     };
 }
 
-pub const test_all: bool = true;
+pub const test_all: bool = false;
 
 test "main test example" {
     const w = 800;
