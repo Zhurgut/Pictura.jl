@@ -406,7 +406,7 @@ pub const test_all: bool = false;
 test "main test example" {
     const w = 800;
     const h = 600;
-    try init._init(w, h, false);
+    try init.init(w, h, false);
 
     try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 

@@ -201,7 +201,7 @@ test "sdl utils" {
         }
 
         fn run() !void {
-            try root.init._init(800, 600, false);
+            try root.init.init(800, 600, false);
 
             std.debug.print("refresh rate: {d}\n", .{try get_display_refresh_rate(root.pictura_app.window)});
             std.debug.print("display size: {d} x {d}\n", try get_display_size(root.pictura_app.window));

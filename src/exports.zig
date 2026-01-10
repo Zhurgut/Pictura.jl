@@ -9,7 +9,7 @@ pub export fn error_string(err: u32) [*:0]const u8 {
 }
 
 pub export fn init(w: u32, h: u32, hdpi: i32) u32 {
-    root.init._init(w, h, hdpi != 0) catch |e| {
+    root.init.init(w, h, hdpi != 0) catch |e| {
         return @intFromError(e);
     };
     return 0;
