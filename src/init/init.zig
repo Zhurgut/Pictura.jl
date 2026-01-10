@@ -17,7 +17,7 @@ fn print_sdl_error() void {
     std.debug.print("{s}\n", .{sdl.SDL_GetError()});
 }
 
-pub fn create_window_and_vkinstance(w: u32, h: u32, hdpi: bool, additional_extensions: ?[][*:0]const u8, layers: ?[][*:0]const u8) !struct { *sdl.SDL_Window, vulkan.VkInstance } {
+pub fn create_window_and_vkinstance(w: u32, h: u32, additional_extensions: ?[][*:0]const u8, layers: ?[][*:0]const u8) !struct { *sdl.SDL_Window, vulkan.VkInstance } {
     const success = sdl.SDL_Init(sdl.SDL_INIT_VIDEO | sdl.SDL_INIT_AUDIO | sdl.SDL_INIT_GAMEPAD);
     if (!success) {
         print_sdl_error();
@@ -25,13 +25,11 @@ pub fn create_window_and_vkinstance(w: u32, h: u32, hdpi: bool, additional_exten
     }
     errdefer sdl.SDL_Quit();
 
-    const hdpi_flag: u32 = if (hdpi) sdl.SDL_WINDOW_HIGH_PIXEL_DENSITY else 0;
-
     const window: ?*sdl.SDL_Window = sdl.SDL_CreateWindow(
         "Pictura",
         @intCast(w),
         @intCast(h),
-        sdl.SDL_WINDOW_RESIZABLE | sdl.SDL_WINDOW_INPUT_FOCUS | sdl.SDL_WINDOW_VULKAN | hdpi_flag,
+        sdl.SDL_WINDOW_RESIZABLE | sdl.SDL_WINDOW_INPUT_FOCUS | sdl.SDL_WINDOW_VULKAN,
     );
     if (window == null) {
         print_sdl_error();
@@ -238,11 +236,10 @@ pub fn init_app(
     };
 }
 
-pub fn init(w: u32, h: u32, hdpi: bool) !void {
+pub fn init(w: u32, h: u32) !void {
     const window, const instance = try create_window_and_vkinstance(
         w,
         h,
-        hdpi,
         null,
         null,
     );
