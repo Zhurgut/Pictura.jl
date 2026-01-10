@@ -17,7 +17,7 @@ test "test format" {
     const w = 200;
     const h = 200;
 
-    try root.init._init(w, h, false);
+    try root.init.init(w, h, false);
 
     var pictura_app = &root.pictura_app;
 
@@ -71,12 +71,10 @@ pub const PicturaImage = struct {
     pixels: ?[*]u32, // ptr to pixels in host memory
 
     pub fn create(w: u32, h: u32, device: vulkan.VkDevice, queue_family_index: u32, physical_device: vulkan.VkPhysicalDevice) !PicturaImage {
-        const memory_type_index = try root.utils.get_device_memory_index(physical_device);
-
         const image = try utils.create_image(device, w, h, queue_family_index, format);
         errdefer vulkan.vkDestroyImage.?(device, image, null);
 
-        const memory = try utils.bind_image_memory(device, image, memory_type_index);
+        const memory = try utils.bind_image_memory(device, image, physical_device);
         errdefer vulkan.vkFreeMemory.?(device, memory, null);
 
         const image_view = try utils.create_image_view(image, device, format);
@@ -184,7 +182,7 @@ pub const PicturaImage = struct {
             .sType = vulkan.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .pNext = null,
             .allocationSize = requirements.size,
-            .memoryTypeIndex = try utils.get_RAM_memory_index(app.physical_device),
+            .memoryTypeIndex = try utils.get_RAM_memory_index(app.physical_device, requirements.memoryTypeBits),
         };
 
         var memory: vulkan.VkDeviceMemory = undefined;
