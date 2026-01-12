@@ -14,6 +14,23 @@ VkResult create_instance(VkInstance* p_instance, uint32_t nr_extensions, const c
     VkResult result = volkInitialize();
     CHECK_ELSE_RETURN(result, "volk initialization failed");
 
+
+    uint32_t api_version;
+
+    if (vkEnumerateInstanceVersion) {
+        result = vkEnumerateInstanceVersion(&api_version);
+    } else {
+        CHECK_ELSE_RETURN(VK_ERROR_INITIALIZATION_FAILED, "vkEnumerateInstanceVersion not available -> only vulkan 1.0 available (1.3 required)");
+    }
+
+    CHECK_ELSE_RETURN(result, "failed to enumerateInstanceVersion");
+
+    if (api_version < VK_API_VERSION_1_3) {
+        fprintf(stderr, "supported version on instance level: %d.%d.%d\n", VK_API_VERSION_MAJOR(api_version), VK_API_VERSION_MINOR(api_version), VK_API_VERSION_PATCH(api_version));
+        CHECK_ELSE_RETURN(VK_ERROR_INITIALIZATION_FAILED, "vulkan 1.3 not supported");
+    }
+
+
     VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.apiVersion = VK_API_VERSION_1_3;
@@ -49,12 +66,21 @@ VkResult create_physical_device(VkPhysicalDevice* p_physical_device, uint32_t de
     CHECK_ELSE_RETURN(result, "failed to enumerate devices");
 
     *p_physical_device = devices[device_index];
+
+    VkPhysicalDeviceProperties2 props;
+    props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    vkGetPhysicalDeviceProperties2(*p_physical_device, &props);
+
+    uint32_t api_version = props.properties.apiVersion;
+    if (api_version < VK_API_VERSION_1_3) {
+        fprintf(stderr, "supported version on device level: %d.%d.%d\n", VK_API_VERSION_MAJOR(api_version), VK_API_VERSION_MINOR(api_version), VK_API_VERSION_PATCH(api_version));
+        CHECK_ELSE_RETURN(VK_ERROR_INITIALIZATION_FAILED, "vulkan 1.3 not supported");
+    }
     
     return result;
 }
 
 
-// TODO check device (and instance?) can handle API version 1.3 
 
 VkResult create_device(
         VkDevice* p_device, uint32_t* p_queue_family_index, 
@@ -101,7 +127,6 @@ VkResult create_device(
 
     VkDeviceCreateInfo dev_create_info = {0};
     dev_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    // dev_create_info.pNext = &dynamic_rendering;
     dev_create_info.pNext = features;
     dev_create_info.queueCreateInfoCount = 1;
     dev_create_info.pQueueCreateInfos = &queue_create_info;
