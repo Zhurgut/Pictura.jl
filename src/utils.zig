@@ -159,6 +159,7 @@ pub fn get_RAM_memory_index(physical_device: vulkan.VkPhysicalDevice, req_bits: 
 pub fn create_image(device: vulkan.VkDevice, w: u32, h: u32, queue_family_index: u32, format: vulkan.VkFormat) !vulkan.VkImage {
     var info: vulkan.VkImageCreateInfo = std.mem.zeroes(vulkan.VkImageCreateInfo);
     info.sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.flags = vulkan.VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     info.imageType = vulkan.VK_IMAGE_TYPE_2D;
     info.format = format;
     info.extent = .{ .width = w, .height = h, .depth = 1 };
@@ -506,7 +507,13 @@ pub fn create_descriptor_pool(device: vulkan.VkDevice) !vulkan.VkDescriptorPool 
     };
     sum += 1024;
 
-    const sizes = [_]vulkan.VkDescriptorPoolSize{s1};
+    const s2: vulkan.VkDescriptorPoolSize = .{
+        .type = vulkan.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        .descriptorCount = 1024,
+    };
+    sum += 1024;
+
+    const sizes = [_]vulkan.VkDescriptorPoolSize{ s1, s2 };
 
     const info: vulkan.VkDescriptorPoolCreateInfo = .{
         .sType = vulkan.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,

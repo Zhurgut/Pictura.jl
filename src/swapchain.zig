@@ -64,6 +64,7 @@ pub const Swapchain = struct {
                 .image = images[i],
                 .image_view = try utils.create_image_view(images[i], device, out.view_format),
                 .sample_ds = null,
+                .storage_ds = null,
                 .last_op = .none,
                 .staging_buffer_memory = null,
                 .staging_buffer = null,
