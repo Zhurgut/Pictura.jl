@@ -35,6 +35,11 @@ pub const Pipelines = struct {
     mix2_pipeline_layout: vulkan.VkPipelineLayout,
     mix2_pipeline: vulkan.VkPipeline,
 
+    storage_img_dsl: vulkan.VkDescriptorSetLayout,
+
+    filter_pipeline_layout: vulkan.VkPipelineLayout,
+    filter_pipeline: vulkan.VkPipeline,
+
     pub fn create(device: vulkan.VkDevice, swapchain_img_format: vulkan.VkFormat) !Pipelines {
         var out: Pipelines = undefined;
 
@@ -111,7 +116,7 @@ pub const Pipelines = struct {
 
         out.copy_img_pipeline = try utils.two_stage_graphics_pipeline(
             device,
-            image.format,
+            image.view_format,
             shaders.modules.fullscreen,
             shaders.modules.texture_sample,
             out.copy_img_pipeline_layout,
@@ -128,7 +133,7 @@ pub const Pipelines = struct {
 
         out.draw_background_pipeline = try utils.two_stage_graphics_pipeline(
             device,
-            image.format,
+            image.view_format,
             shaders.modules.fullscreen,
             shaders.modules.draw_color,
             out.draw_background_pipeline_layout,
@@ -198,10 +203,26 @@ pub const Pipelines = struct {
         errdefer vulkan.vkDestroyPipelineLayout.?(device, out.mix2_pipeline_layout, null);
         errdefer vulkan.vkDestroyPipeline.?(device, out.mix2_pipeline, null);
 
+        out.storage_img_dsl = try storage_image_descriptor_set_layout(device);
+        errdefer vulkan.vkDestroyDescriptorSetLayout.?(device, out.storage_img_dsl, null);
+
+        out.filter_pipeline_layout, out.filter_pipeline = try compute_filter_pipeline(
+            device,
+            shaders.modules.filter,
+            out.storage_img_dsl,
+        );
+        errdefer vulkan.vkDestroyPipelineLayout.?(device, out.filter_pipeline_layout, null);
+        errdefer vulkan.vkDestroyPipeline.?(device, out.filter_pipeline, null);
+
         return out;
     }
 
     pub fn destroy(pipelines: *Pipelines, device: vulkan.VkDevice) void {
+        vulkan.vkDestroyPipeline.?(device, pipelines.filter_pipeline, null);
+        vulkan.vkDestroyPipelineLayout.?(device, pipelines.filter_pipeline_layout, null);
+
+        vulkan.vkDestroyDescriptorSetLayout.?(device, pipelines.storage_img_dsl, null);
+
         vulkan.vkDestroyPipeline.?(device, pipelines.mix2_pipeline, null);
         vulkan.vkDestroyPipelineLayout.?(device, pipelines.mix2_pipeline_layout, null);
 
@@ -334,7 +355,7 @@ fn draw_shape_pipeline(
 
     const pipeline = try utils.two_stage_graphics_pipeline(
         device,
-        image.format,
+        image.view_format,
         if (centered) shaders.modules.quad_centered_out else shaders.modules.quad,
         fragshader,
         pipeline_layout,
@@ -368,12 +389,93 @@ fn mix_channels_pipeline(
 
     const pipeline = try utils.two_stage_graphics_pipeline(
         device,
-        image.format,
+        image.view_format,
         shaders.modules.fullscreen,
         fragshader,
         pipeline_layout,
         vulkan.VK_FALSE,
     );
+
+    return .{ pipeline_layout, pipeline };
+}
+
+fn storage_image_descriptor_set_layout(
+    device: vulkan.VkDevice,
+) !vulkan.VkDescriptorSetLayout {
+    const img_binding: vulkan.VkDescriptorSetLayoutBinding = .{
+        .binding = 0,
+        .descriptorType = vulkan.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        .descriptorCount = 1,
+        .stageFlags = vulkan.VK_SHADER_STAGE_COMPUTE_BIT,
+        .pImmutableSamplers = null,
+    };
+
+    const layout_info: vulkan.VkDescriptorSetLayoutCreateInfo = .{
+        .sType = vulkan.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = null,
+        .flags = 0,
+        .bindingCount = 1,
+        .pBindings = &img_binding,
+    };
+
+    var descriptor_set_layout: vulkan.VkDescriptorSetLayout = undefined;
+    const result = vulkan.vkCreateDescriptorSetLayout.?(device, &layout_info, null, &descriptor_set_layout);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create descriptor set layout: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_descriptor_set_layout;
+    }
+
+    return descriptor_set_layout;
+}
+
+fn compute_filter_pipeline(
+    device: vulkan.VkDevice,
+    shader: vulkan.VkShaderModule,
+    img_dsl: vulkan.VkDescriptorSetLayout,
+) !struct { vulkan.VkPipelineLayout, vulkan.VkPipeline } {
+    const pcr: vulkan.VkPushConstantRange = .{
+        .stageFlags = vulkan.VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = 14 * @sizeOf(f32),
+    };
+
+    const dsls = [2]vulkan.VkDescriptorSetLayout{ img_dsl, img_dsl };
+
+    var pipeline_layout_info = std.mem.zeroes(vulkan.VkPipelineLayoutCreateInfo);
+    pipeline_layout_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount = 2;
+    pipeline_layout_info.pSetLayouts = &dsls;
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges = &pcr;
+
+    var pipeline_layout: vulkan.VkPipelineLayout = undefined;
+
+    var result = vulkan.vkCreatePipelineLayout.?(device, &pipeline_layout_info, null, &pipeline_layout);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create pipeline layout: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_pipeline_layout;
+    }
+    errdefer vulkan.vkDestroyPipelineLayout.?(device, pipeline_layout, null);
+
+    var shader_stage_info = std.mem.zeroes(vulkan.VkPipelineShaderStageCreateInfo);
+    shader_stage_info.sType = vulkan.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stage_info.stage = vulkan.VK_SHADER_STAGE_COMPUTE_BIT;
+    shader_stage_info.module = shader;
+    shader_stage_info.pName = "main";
+
+    var pipeline_create_info = std.mem.zeroes(vulkan.VkComputePipelineCreateInfo);
+    pipeline_create_info.sType = vulkan.VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipeline_create_info.stage = shader_stage_info;
+    pipeline_create_info.layout = pipeline_layout;
+
+    var pipeline: vulkan.VkPipeline = undefined;
+
+    result = vulkan.vkCreateComputePipelines.?(device, null, 1, &pipeline_create_info, null, &pipeline);
+    if (result != vulkan.VK_SUCCESS) {
+        std.debug.print("failed to create pipeline: {s}\n", .{vulkan.string_VkResult(result)});
+        return error.Vk_failed_to_create_pipeline;
+    }
+    errdefer vulkan.vkDestroyPipeline.?(device, pipeline, null);
 
     return .{ pipeline_layout, pipeline };
 }
