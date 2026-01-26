@@ -1,0 +1,71 @@
+#version 450
+
+layout(push_constant) uniform PushConstants {
+    float weights[9]; // rowmajor
+    float max_weight;
+    float min_weight;
+    float avg_weight;
+    float std_weight; // std deviation
+    float offset;
+} pc;
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+
+layout (set=0, binding = 0, rgba8) uniform readonly image2D src_image;
+layout (set=1, binding = 0, rgba8) uniform writeonly image2D dst_image;
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size  = imageSize(src_image);
+
+    if (coord.x >= size.x || coord.y >= size.y)
+        return;
+
+    vec4 maximum = imageLoad(src_image, coord);
+    vec4 minimum = imageLoad(src_image, coord);
+    vec4 average = vec4(0.0);
+    vec4 color = vec4(pc.offset);
+
+
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            ivec2 s = coord + ivec2(x, y);
+            ivec2 s2 = clamp(s, ivec2(0), size - 1);
+            vec4 val = imageLoad(src_image, s2);
+            
+            color += pc.weights[(y+1)*3 + x + 1] * val;
+
+            average += val;
+            maximum = max(maximum, val);
+            minimum = min(minimum, val);
+        }
+    }
+
+    average *= 0.11111111111111111111;
+
+    color += pc.max_weight * maximum + pc.min_weight * minimum + pc.avg_weight * average;
+    
+    if (pc.std_weight == 0) {
+        imageStore(dst_image, coord, color);
+        return;
+    }
+
+    vec4 var = vec4(0.0);
+
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            ivec2 s = coord + ivec2(x, y);
+            ivec2 s2 = clamp(s, ivec2(0), size - 1);
+            vec4 d = imageLoad(src_image, s2) - average;
+            var += d * d;
+        }
+    }
+
+    vec4 std = sqrt(var * 0.111111111111111111111);
+
+    color += pc.std_weight * std;
+
+    imageStore(dst_image, coord, color);
+    
+}
