@@ -105,7 +105,7 @@ pub const PicturaApp = struct {
         );
         errdefer new_canvas.destroy(app.device, app.descriptor_pool);
 
-        try image.copy_img(&new_canvas, &app.canvas, app.pipelines.copy_img_pipeline, app);
+        try image.draw_full_img(&new_canvas, &app.canvas, app.pipelines.draw_full_img_pipeline, app);
 
         try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
 
@@ -407,6 +407,7 @@ test "main test example" {
     const w = 800;
     const h = 600;
     try init.init(w, h);
+    defer init.quit();
 
     try image.draw_background(&pictura_app.canvas, 1.0, 1.0, 1.0, 1.0, &pictura_app);
 
@@ -441,6 +442,7 @@ test "main test example" {
     const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
 
     var background: image.PicturaImage = try .from_pixels(w, h, pixels, &pictura_app);
+    defer background.destroy(pictura_app.device, pictura_app.descriptor_pool);
 
     try image.mix_channels(
         &background,
@@ -472,12 +474,34 @@ test "main test example" {
         &pictura_app,
     );
 
+    var img2 = try image.PicturaImage.create(
+        w,
+        h,
+        pictura_app.device,
+        pictura_app.queue_family_index,
+        pictura_app.physical_device,
+    );
+    defer img2.destroy(pictura_app.device, pictura_app.descriptor_pool);
+
     const start = sdl.SDL_GetTicksNS();
     while (pictura_app.running) {
         pictura_app.wait_until_next_frame();
         try pictura_app.event_handler.handle_events(&pictura_app);
 
-        try image.copy_img(&pictura_app.canvas, &background, pictura_app.pipelines.copy_img_pipeline, &pictura_app);
+        try image.draw_full_img(&img2, &background, pictura_app.pipelines.draw_full_img_pipeline, &pictura_app);
+
+        const x = pictura_app.event_handler.mouse.x;
+        const y = pictura_app.event_handler.mouse.y;
+        const s = 250;
+        try image.draw_img(
+            &img2,
+            &pictura_app.canvas,
+            &pictura_app,
+            [8]f32{ x, y - s, x + s, y, x - s, y, x, y + s },
+            [8]f32{ 50, 50, @floatFromInt(w - 50), 50, 50, @floatFromInt(h - 50), @floatFromInt(w - 50), @floatFromInt(h - 50) },
+        );
+
+        try image.draw_full_img(&pictura_app.canvas, &img2, pictura_app.pipelines.draw_full_img_pipeline, &pictura_app);
 
         try image.draw_line(
             &pictura_app.canvas,
@@ -507,7 +531,4 @@ test "main test example" {
     std.debug.print("{any}\n", .{@as(f64, @floatFromInt(stop - start)) * 1e-9});
 
     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
-    background.destroy(pictura_app.device, pictura_app.descriptor_pool);
-
-    init.quit();
 }

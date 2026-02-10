@@ -308,7 +308,11 @@ fn set_viewport_and_scissor(w: u32, h: u32, command_buffer: vulkan.VkCommandBuff
     vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
 }
 
-pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
+pub fn draw_full_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
+    if (src == dst) {
+        return error.src_cant_equal_dst;
+    }
+
     var command_buffer = try app.well.record(app.device);
 
     var src_barrier = utils.get_image_memory_barrier(src, .sample_src, app.queue_family_index);
@@ -330,7 +334,7 @@ pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipel
     vulkan.vkCmdBindDescriptorSets.?(
         command_buffer,
         vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS,
-        app.pipelines.copy_img_pipeline_layout,
+        app.pipelines.draw_full_img_pipeline_layout,
         0,
         1,
         &descriptor_set,
@@ -339,6 +343,63 @@ pub fn copy_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipel
     );
 
     vulkan.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
+}
+
+pub fn draw_img(
+    dst: *PicturaImage,
+    src: *PicturaImage,
+    app: *root.PicturaApp,
+    dst_rect: [8]f32, // tl, tr, bl, br
+    src_rect: [8]f32, // tl, tr, bl, br
+) !void {
+    if (src == dst) {
+        return error.src_cant_equal_dst;
+    }
+
+    for (0..4) |i| {
+        const p = src_rect[2 * i .. 2 * i + 2][0..2].*;
+        if (p[0] < 0 or p[0] > @as(f32, @floatFromInt(src.w))) {
+            return error.src_rect_out_of_bounds;
+        }
+        if (p[1] < 0 or p[1] > @as(f32, @floatFromInt(src.h))) {
+            return error.src_rect_out_of_bounds;
+        }
+    }
+
+    var pcr = [2]f32{ 2 / @as(f32, @floatFromInt(dst.w)), 2 / @as(f32, @floatFromInt(dst.h)) } ++ [2]f32{ 1 / @as(f32, @floatFromInt(src.w)), 1 / @as(f32, @floatFromInt(src.h)) } ++ dst_rect ++ src_rect;
+
+    var command_buffer = try app.well.record(app.device);
+
+    var src_barrier = utils.get_image_memory_barrier(src, .sample_src, app.queue_family_index);
+    utils.submit_image_memory_barrier(command_buffer, &src_barrier);
+
+    var dst_barrier = utils.get_image_memory_barrier(dst, .draw_dst, app.queue_family_index);
+    command_buffer = try app.well.render_into(dst, &dst_barrier, app.device);
+
+    set_viewport_and_scissor(dst.w, dst.h, command_buffer);
+
+    vulkan.vkCmdBindPipeline.?(command_buffer, vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipelines.draw_img_pipeline);
+
+    vulkan.vkCmdPushConstants.?(command_buffer, app.pipelines.draw_img_pipeline_layout, vulkan.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(@TypeOf(pcr)), &pcr);
+
+    var descriptor_set = try src.get_sample_ds(
+        app.device,
+        app.descriptor_pool,
+        &app.pipelines,
+    );
+
+    vulkan.vkCmdBindDescriptorSets.?(
+        command_buffer,
+        vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS,
+        app.pipelines.draw_img_pipeline_layout,
+        0,
+        1,
+        &descriptor_set,
+        0,
+        null,
+    );
+
+    vulkan.vkCmdDraw.?(command_buffer, 6, 1, 0, 0);
 }
 
 pub fn draw_background(dst: *PicturaImage, r: f32, g: f32, b: f32, a: f32, app: *root.PicturaApp) !void {

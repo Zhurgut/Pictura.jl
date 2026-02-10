@@ -132,10 +132,10 @@ pub const Swapchain = struct {
 
         try swapchain.semaphores.using_image_index(app.device, image_index);
 
-        try image.copy_img(
+        try image.draw_full_img(
             &swapchain.images[image_index],
             &app.canvas,
-            app.pipelines.swapchain_copy_img_pipeline,
+            app.pipelines.swapchain_draw_full_img_pipeline,
             app,
         );
 
