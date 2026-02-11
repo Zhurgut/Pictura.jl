@@ -373,8 +373,6 @@ pub fn image_memory_barrier(
 }
 
 pub fn create_shader_module(spv_ptr: anytype, device: vulkan.VkDevice) !vulkan.VkShaderModule {
-    std.debug.print("{*}*{d}\n", .{ spv_ptr, spv_ptr.len });
-
     const info: vulkan.VkShaderModuleCreateInfo = .{
         .sType = vulkan.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = null,

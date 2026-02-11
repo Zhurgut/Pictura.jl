@@ -158,8 +158,6 @@ fn WellOfCommands2(comptime n: u32) type {
             well.crt_index = well.next();
             well.state = .ready;
 
-            std.debug.print("created well\n", .{});
-
             return well;
         }
 
