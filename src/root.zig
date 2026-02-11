@@ -105,7 +105,7 @@ pub const PicturaApp = struct {
         );
         errdefer new_canvas.destroy(app.device, app.descriptor_pool);
 
-        try image.draw_full_img(&new_canvas, &app.canvas, app.pipelines.draw_full_img_pipeline, app);
+        try image.draw_full_img(&new_canvas, &app.canvas, app.pipelines.draw_full_img_pipeline, app, false);
 
         try app.well.wait(app.device, app.queue); // make sure old resources are no longer in use
 
@@ -488,7 +488,7 @@ test "main test example" {
         pictura_app.wait_until_next_frame();
         try pictura_app.event_handler.handle_events(&pictura_app);
 
-        try image.draw_full_img(&img2, &background, pictura_app.pipelines.draw_full_img_pipeline, &pictura_app);
+        try image.draw_full_img(&img2, &background, pictura_app.pipelines.draw_full_img_pipeline, &pictura_app, true);
 
         const x = pictura_app.event_handler.mouse.x;
         const y = pictura_app.event_handler.mouse.y;
@@ -499,9 +499,10 @@ test "main test example" {
             &pictura_app,
             [8]f32{ x, y - s, x + s, y, x - s, y, x, y + s },
             [8]f32{ 50, 50, @floatFromInt(w - 50), 50, 50, @floatFromInt(h - 50), @floatFromInt(w - 50), @floatFromInt(h - 50) },
+            false,
         );
 
-        try image.draw_full_img(&pictura_app.canvas, &img2, pictura_app.pipelines.draw_full_img_pipeline, &pictura_app);
+        try image.draw_full_img(&pictura_app.canvas, &img2, pictura_app.pipelines.draw_full_img_pipeline, &pictura_app, true);
 
         try image.draw_line(
             &pictura_app.canvas,

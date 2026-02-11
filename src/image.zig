@@ -69,7 +69,8 @@ pub const PicturaImage = struct {
     memory: ?vulkan.VkDeviceMemory,
     image: vulkan.VkImage,
     image_view: vulkan.VkImageView, // we always just need one view, we dont do anything fancy with these
-    sample_ds: ?vulkan.VkDescriptorSet,
+    sample_nearest_ds: ?vulkan.VkDescriptorSet,
+    sample_linear_ds: ?vulkan.VkDescriptorSet,
     storage_ds: ?vulkan.VkDescriptorSet,
     last_op: Op,
     staging_buffer: ?vulkan.VkBuffer,
@@ -92,7 +93,8 @@ pub const PicturaImage = struct {
             .memory = memory,
             .image = image,
             .image_view = image_view,
-            .sample_ds = null,
+            .sample_nearest_ds = null,
+            .sample_linear_ds = null,
             .storage_ds = null,
             .last_op = .none,
             .staging_buffer = null,
@@ -118,9 +120,16 @@ pub const PicturaImage = struct {
         device: vulkan.VkDevice,
         d_pool: vulkan.VkDescriptorPool,
         pipelines: *root.pipelines.Pipelines,
+        use_nearest_sampling: bool,
     ) !vulkan.VkDescriptorSet {
-        if (pimage.sample_ds) |set| {
-            return set;
+        if (use_nearest_sampling) {
+            if (pimage.sample_nearest_ds) |set| {
+                return set;
+            }
+        } else {
+            if (pimage.sample_linear_ds) |set| {
+                return set;
+            }
         }
 
         const info: vulkan.VkDescriptorSetAllocateInfo = .{
@@ -138,7 +147,7 @@ pub const PicturaImage = struct {
         }
 
         const image_info: vulkan.VkDescriptorImageInfo = .{
-            .sampler = pipelines.nearest_sampler,
+            .sampler = if (use_nearest_sampling) pipelines.nearest_sampler else pipelines.linear_sampler,
             .imageView = pimage.image_view,
             .imageLayout = vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
@@ -152,7 +161,11 @@ pub const PicturaImage = struct {
 
         vulkan.vkUpdateDescriptorSets.?(device, 1, &write_ds, 0, null); // never update it again!
 
-        pimage.sample_ds = set;
+        if (use_nearest_sampling) {
+            pimage.sample_nearest_ds = set;
+        } else {
+            pimage.sample_linear_ds = set;
+        }
 
         return set;
     }
@@ -265,7 +278,16 @@ pub const PicturaImage = struct {
             vulkan.vkDestroyBuffer.?(device, buf, null);
         }
 
-        if (pimage.sample_ds) |ds| {
+        if (pimage.sample_nearest_ds) |ds| {
+            const result = vulkan.vkFreeDescriptorSets.?(device, descriptor_pool, 1, &ds);
+
+            if (result != vulkan.VK_SUCCESS) {
+                std.debug.print("failed to free descriptorset: {s}\n", .{vulkan.string_VkResult(result)});
+                // dont return an error here, this should never happen, fingers crossed
+            }
+        }
+
+        if (pimage.sample_linear_ds) |ds| {
             const result = vulkan.vkFreeDescriptorSets.?(device, descriptor_pool, 1, &ds);
 
             if (result != vulkan.VK_SUCCESS) {
@@ -277,7 +299,8 @@ pub const PicturaImage = struct {
         pimage.pixels = null;
         pimage.staging_buffer_memory = null;
         pimage.staging_buffer = null;
-        pimage.sample_ds = null;
+        pimage.sample_nearest_ds = null;
+        pimage.sample_linear_ds = null;
 
         vulkan.vkDestroyImageView.?(device, pimage.image_view, null);
         if (pimage.memory) |mem| {
@@ -308,10 +331,11 @@ fn set_viewport_and_scissor(w: u32, h: u32, command_buffer: vulkan.VkCommandBuff
     vulkan.vkCmdSetScissor.?(command_buffer, 0, 1, &scissor);
 }
 
-pub fn draw_full_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp) !void {
+pub fn draw_full_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.VkPipeline, app: *root.PicturaApp, use_nearest_sampling: bool) !void {
     if (src == dst) {
         return error.src_cant_equal_dst;
     }
+    std.debug.assert(src.w == dst.w and src.h == dst.h);
 
     var command_buffer = try app.well.record(app.device);
 
@@ -329,6 +353,7 @@ pub fn draw_full_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.Vk
         app.device,
         app.descriptor_pool,
         &app.pipelines,
+        use_nearest_sampling,
     );
 
     vulkan.vkCmdBindDescriptorSets.?(
@@ -351,6 +376,7 @@ pub fn draw_img(
     app: *root.PicturaApp,
     dst_rect: [8]f32, // tl, tr, bl, br
     src_rect: [8]f32, // tl, tr, bl, br
+    use_nearest_sampling: bool,
 ) !void {
     if (src == dst) {
         return error.src_cant_equal_dst;
@@ -386,6 +412,7 @@ pub fn draw_img(
         app.device,
         app.descriptor_pool,
         &app.pipelines,
+        use_nearest_sampling,
     );
 
     vulkan.vkCmdBindDescriptorSets.?(
@@ -702,6 +729,7 @@ pub fn mix_channels(
         app.device,
         app.descriptor_pool,
         &app.pipelines,
+        false,
     );
 
     vulkan.vkCmdBindDescriptorSets.?(
@@ -755,6 +783,7 @@ pub fn mix_channels2(
         app.device,
         app.descriptor_pool,
         &app.pipelines,
+        false,
     );
 
     vulkan.vkCmdBindDescriptorSets.?(

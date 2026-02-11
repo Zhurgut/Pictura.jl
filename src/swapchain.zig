@@ -63,7 +63,8 @@ pub const Swapchain = struct {
                 .memory = null,
                 .image = images[i],
                 .image_view = try utils.create_image_view(images[i], device, out.view_format),
-                .sample_ds = null,
+                .sample_nearest_ds = null,
+                .sample_linear_ds = null,
                 .storage_ds = null,
                 .last_op = .none,
                 .staging_buffer_memory = null,
@@ -137,6 +138,7 @@ pub const Swapchain = struct {
             &app.canvas,
             app.pipelines.swapchain_draw_full_img_pipeline,
             app,
+            true,
         );
 
         const command_buffer = try app.well.record(app.device);
