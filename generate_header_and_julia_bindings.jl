@@ -30,11 +30,70 @@ is_function_type(arg) = contains(arg, "*const fn")
 function get_function_type_arg(s)
     m = match(r"\*const fn \((?<args>.*?)\) callconv\(.c\) (?<return_type>.+)", s)
     return (type="*const fn", args=get_args(m[:args]), return_type=m[:return_type])
-
 end
 
 
 
+function translate_type(s, julia=false)
+    return if s == "u32"
+        julia ? "UInt32" : "uint32_t"
+    elseif s == "*const fn"
+        julia ? "Ptr{Cvoid}" : error("noo!")
+    elseif s == "ErrorCode"
+        julia ? "UInt32" : "uint32_t"
+    elseif s == "root.vulkan.PFN_vkVoidFunction"
+        julia ? nothing : "PFN_vkVoidFunction"
+    elseif s == "root.vulkan.VkInstance"
+        julia ? nothing : "VkInstance"
+    elseif s == "root.vulkan.VkPhysicalDevice"
+        julia ? nothing : "VkPhysicalDevice"
+    elseif s == "root.vulkan.VkDevice"
+        julia ? nothing : "VkDevice"
+    elseif s == "root.vulkan.VkQueue"
+        julia ? nothing : "VkQueue"
+    elseif s == "*root.vulkan.VkCommandBuffer"
+        julia ? nothing : "VkCommandBuffer*"
+    elseif s == "i32"
+        julia ? "Int32" : "int32_t"
+    elseif s == "[*:0]const u8"
+        julia ? "Cstring" : "const char*"
+    elseif s == "?[*][*:0]const u8"
+        julia ? nothing : "const char**"
+    elseif s == "Image"
+        julia ? "Ptr{Cvoid}" : "Image"
+    elseif s == "?Image"
+        julia ? "Ptr{Cvoid}" : "Image"
+    elseif s == "void"
+        julia ? "Cvoid" : "void"
+    elseif s == "?*anyopaque"
+        julia ? "Ptr{Cvoid}" : "void*"
+    elseif s == "[*]u32"
+        julia ? "Ptr{UInt32}" : "uint32_t*"
+    elseif s == "?[*]u32"
+        julia ? "Ptr{UInt32}" : "uint32_t*"
+    elseif s == "bool"
+        error("bool not unviersally the same")
+    elseif s == "f32"
+        julia ? "Float32" : "float"
+    elseif s == "f64"
+        julia ? "Float64" : "double"
+    elseif s == "u64"
+        julia ? "UInt64" : "uint64_t"
+    elseif s == "?*f32"
+        julia ? "Ptr{Float32}" : "float*"
+    elseif s == "?*i32"
+        julia ? "Ptr{Int32}" : "int32_t*"
+    elseif s == "u8"
+        julia ? "UInt8" : "uint8_t"
+    elseif s == "*u32"
+        julia ? "Ptr{UInt32}" : "uint32_t*"
+    elseif s == "*i32"
+        julia ? "Ptr{Int32}" : "int32_t*"
+    else
+        error("$s undefined, cannot translate type")
+    end
+    
+end
 
 
 #
@@ -44,66 +103,6 @@ function translate_constant(c)
     return "#define $(c.name) $(c.value)\n"
 end
 
-function translate_type(s)
-    return if s == "u32"
-        "uint32_t"
-    elseif s == "ErrorCode"
-        "uint32_t"
-    elseif s == "root.vulkan.PFN_vkVoidFunction"
-        "PFN_vkVoidFunction"
-    elseif s == "root.vulkan.VkInstance"
-        "VkInstance"
-    elseif s == "root.vulkan.VkPhysicalDevice"
-        "VkPhysicalDevice"
-    elseif s == "root.vulkan.VkDevice"
-        "VkDevice"
-    elseif s == "root.vulkan.VkQueue"
-        "VkQueue"
-    elseif s == "*root.vulkan.VkCommandBuffer"
-        "VkCommandBuffer*"
-    elseif s == "i32"
-        "int32_t"
-    elseif s == "[*:0]const u8"
-        "const char*"
-    elseif s == "?[*][*:0]const u8"
-        "const char**"
-    elseif s == "Image"
-        "Image"
-    elseif s == "?Image"
-        "Image"
-    elseif s == "void"
-        "void"
-    elseif s == "?*anyopaque"
-        "void*"
-    elseif s == "callconv(.c) void"
-        "void"
-    elseif s == "[*]u32"
-        "uint32_t*"
-    elseif s == "?[*]u32"
-        "uint32_t*"
-    elseif s == "bool"
-        error("bool not unviersally the same")
-    elseif s == "f32"
-        "float"
-    elseif s == "f64"
-        "double"
-    elseif s == "u64"
-        "uint64_t"
-    elseif s == "?*f32"
-        "float*"
-    elseif s == "?*i32"
-        "int32_t*"
-    elseif s == "u8"
-        "uint8_t"
-    elseif s == "*u32"
-        "uint32_t*"
-    elseif s == "*i32"
-        "int32_t*"
-    else
-        error("$s undefined, cannot translate type")
-    end
-    
-end
 
 function translate_args(args)
     out = ""
@@ -131,9 +130,8 @@ end
 
 
 
-#
-# functions to generate julia bindings
-#
+
+
 
 
 function write_c_header(out, constants, functions)
@@ -155,54 +153,70 @@ function write_c_header(out, constants, functions)
     write(out, "\n#endif")
 end
 
+
+
+
+
+
+
+
 function write_jl_module(out, constants, functions)
-    write(out, """
-module PicturaLib
-
-using CBinding
-
-c`-std=c99 -I\$(joinpath(@__DIR__, "..", "include")) -L\$(@__DIR__) -lpictura`
-
-c"uint8_t" = UInt8
-c"uint16_t" = UInt16
-c"uint32_t" = UInt32
-c"uint64_t" = UInt64
-
-c"int8_t" = Int8
-c"int16_t" = Int16
-c"int32_t" = Int32
-c"int64_t" = Int64
-
-c"VkResult" = Int32
-c"PFN_vkVoidFunction" = Cptr{Cvoid}
-c"VkInstance" = Cptr{Cvoid}
-c"VkPhysicalDevice" = Cptr{Cvoid}
-c"VkDevice" = Cptr{Cvoid}
-c"VkQueue" = Cptr{Cvoid}
-c"VkCommandBuffer" = Cptr{Cvoid}
-# Sys.WORD_SIZE == 64 ? Ptr{Cvoid} : UInt64 # for non-dispatchable handles
-
-c\"\"\"
-#include "picturalib.h"
-\"\"\"n
-
-""")
+    write(out, "\nmodule PicturaLib\n\n")
 
     for c in constants
         write(out, "const $(c.name) = $(c.value)\n")
     end
 
-    write(out, "\n")
+    write(out, "\nlib = joinpath(@__DIR__, \"libpictura\")\n")
     
     for f in functions
+        
         if !contains(f.name, "_vk_") && f.name != "init2" 
-            write(out, "const $(f.name) = c\"$(f.name)\"[]\n")
+            write(out, "\n")
+
+            argnames = join([a.name for a in f.args], ", ")
+            rhs_args = "\n" * join(["\t\t$(a.name)::$(translate_type(a.type, true))" for a in f.args], ",\n") * "\n\t"
+            if length(f.args) == 0
+                rhs_args = ""
+            end
+
+            for a in f.args
+                if a.type == "*const fn"
+                    args = join(["$(translate_type(a.type, true))" for a in a.fn_arg.args], ", ") * ","
+                    write(out, "# $(a.name) = @cfunction(your_julia_function, $(translate_type(a.fn_arg.return_type, true)), ($(args)))\n")
+                end
+            end
+
+            if f.return_type == "ErrorCode"
+                write(out, """
+function $(f.name)($argnames)
+    err = @ccall lib.$(f.name)($rhs_args)::$(translate_type(f.return_type, true))
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+""")
+            else
+                write(out, """
+function $(f.name)($argnames)
+    @ccall lib.$(f.name)($rhs_args)::$(translate_type(f.return_type, true))
+end
+""")        
+            end
         end
     end
 
     write(out, "\n\nend")
 
 end
+
+
+
+
+
+
 
 function main()
     cd(@__DIR__)
@@ -218,7 +232,6 @@ function main()
     
     constants = get_constants(sin)
     
-
     c_header = open("zig-out/include/picturalib.h", "w")
     write_c_header(c_header, constants, functions)
     close(c_header)
