@@ -2,13 +2,14 @@ const std = @import("std");
 const root = @import("root.zig");
 
 const Image = *anyopaque;
+const ErrorCode = u32;
 
 // convert zig errors to strings :)
 pub export fn error_string(err: u32) [*:0]const u8 {
     return @errorName(@errorFromInt(@as(u16, @intCast(err))));
 }
 
-pub export fn init(w: u32, h: u32) u32 {
+pub export fn init(w: u32, h: u32) ErrorCode {
     root.init.init(w, h) catch |e| {
         return @intFromError(e);
     };
@@ -29,7 +30,7 @@ pub export fn get_canvas() Image {
     return &root.pictura_app.canvas;
 }
 
-pub export fn draw_background(image: Image, r: f32, g: f32, b: f32, a: f32) u32 {
+pub export fn draw_background(image: Image, r: f32, g: f32, b: f32, a: f32) ErrorCode {
     root.image.draw_background(@ptrCast(@alignCast(image)), r, g, b, a, &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
@@ -40,14 +41,14 @@ pub export fn wait_until_next_frame() void {
     root.pictura_app.wait_until_next_frame();
 }
 
-pub export fn handle_events() u32 {
+pub export fn handle_events() ErrorCode {
     root.pictura_app.event_handler.handle_events(&root.pictura_app) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn present() u32 {
+pub export fn present() ErrorCode {
     root.pictura_app.swapchain.present(&root.pictura_app) catch |e| {
         return @intFromError(e);
     };
@@ -115,14 +116,14 @@ pub export fn load_pixels(image: Image) ?[*]u32 {
     return pixels;
 }
 
-pub export fn update_pixels(image: Image) u32 {
+pub export fn update_pixels(image: Image) ErrorCode {
     root.image.update_pixels(@ptrCast(@alignCast(image)), &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn draw_point(image: Image, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32, stroke_radius: f32) u32 {
+pub export fn draw_point(image: Image, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32, stroke_radius: f32) ErrorCode {
     root.image.draw_point2(@ptrCast(@alignCast(image)), x, y, r, g, b, a, stroke_radius, &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
@@ -148,7 +149,7 @@ pub export fn draw_line(
     bl_y: f32,
     br_x: f32,
     br_y: f32,
-) u32 {
+) ErrorCode {
     root.image.draw_line(
         @ptrCast(@alignCast(image)),
         [2]f32{ x1, y1 },
@@ -187,7 +188,7 @@ pub export fn draw_ellipse(
     bl_y: f32,
     br_x: f32,
     br_y: f32,
-) u32 {
+) ErrorCode {
     if (radius_x >= radius_y) {
         root.image.draw_ellipse(
             @ptrCast(@alignCast(image)),
@@ -245,7 +246,7 @@ pub export fn draw_rect(
     bl_y: f32,
     br_x: f32,
     br_y: f32,
-) u32 {
+) ErrorCode {
     root.image.draw_rect(
         @ptrCast(@alignCast(image)),
         [4]f32{ fill_r, fill_g, fill_b, fill_a },
@@ -265,7 +266,7 @@ pub export fn draw_rect(
     return 0;
 }
 
-pub export fn draw_full_image(dst: Image, src: Image, use_nearest_sampling: i32) u32 {
+pub export fn draw_full_image(dst: Image, src: Image, use_nearest_sampling: i32) ErrorCode {
     root.image.draw_full_img(
         @ptrCast(@alignCast(dst)),
         @ptrCast(@alignCast(src)),
@@ -298,7 +299,7 @@ pub export fn draw_image(
     src_bl_y: f32,
     src_br_x: f32,
     src_br_y: f32,
-) u32 {
+) ErrorCode {
     root.image.draw_img(
         @ptrCast(@alignCast(dst)),
         @ptrCast(@alignCast(src)),
@@ -381,35 +382,35 @@ pub export fn get_display_refresh_rate() f32 {
     return r;
 }
 
-pub export fn get_display_size(w: *u32, h: *u32) u32 {
+pub export fn get_display_size(w: *u32, h: *u32) ErrorCode {
     w.*, h.* = root.sdl_utils.get_display_size(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn get_window_position(w: *i32, h: *i32) u32 {
+pub export fn get_window_position(w: *i32, h: *i32) ErrorCode {
     w.*, h.* = root.sdl_utils.get_window_position(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn set_window_position(x: i32, y: i32) u32 {
+pub export fn set_window_position(x: i32, y: i32) ErrorCode {
     root.sdl_utils.set_window_position(root.pictura_app.window, x, y) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn set_fullscreen() u32 {
+pub export fn set_fullscreen() ErrorCode {
     root.sdl_utils.set_fullscreen(&root.pictura_app) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn set_windowed() u32 {
+pub export fn set_windowed() ErrorCode {
     root.sdl_utils.set_windowed(&root.pictura_app) catch |e| {
         return @intFromError(e);
     };
@@ -421,35 +422,35 @@ pub export fn get_window_size(w: *u32, h: *u32) void {
     h.* = root.pictura_app.canvas.h;
 }
 
-pub export fn set_window_size(w: u32, h: u32) u32 {
+pub export fn set_window_size(w: u32, h: u32) ErrorCode {
     root.sdl_utils.set_window_size(&root.pictura_app, w, h) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn set_bordered() u32 {
+pub export fn set_bordered() ErrorCode {
     root.sdl_utils.set_bordered(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn set_borderless() u32 {
+pub export fn set_borderless() ErrorCode {
     root.sdl_utils.set_borderless(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn grab_mouse() u32 {
+pub export fn grab_mouse() ErrorCode {
     root.sdl_utils.grab_mouse(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
-pub export fn release_mouse() u32 {
+pub export fn release_mouse() ErrorCode {
     root.sdl_utils.release_mouse(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
@@ -485,7 +486,7 @@ pub export fn init2(
     features: ?*anyopaque,
     nr_device_extensions: u32,
     device_extensions: ?[*][*:0]const u8,
-) u32 {
+) ErrorCode {
     const inst_ext = if (instance_extensions != null and nr_instance_extensions != 0)
         instance_extensions.?[0..nr_instance_extensions]
     else
@@ -515,7 +516,7 @@ pub export fn init2(
     return 0;
 }
 
-pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) u32 {
+pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) ErrorCode {
     const bf = root.pictura_app.well.record(root.pictura_app.device) catch |e| {
         return @intFromError(e);
     };
@@ -525,7 +526,7 @@ pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) u32 {
 
 // already called begin rendering and did the memory barrier for the render target image
 // no need to call end rendering yerself, just call present()
-pub export fn get_vk_command_buffer_with_render_target(out: *root.vulkan.VkCommandBuffer, image: Image) u32 {
+pub export fn get_vk_command_buffer_with_render_target(out: *root.vulkan.VkCommandBuffer, image: Image) ErrorCode {
     const dst: *root.image.PicturaImage = @ptrCast(@alignCast(image));
 
     // the user cannot access image internals, so the barrier that gets generated here is correct (the user cannot do their own diy vulkan reading and writing from/to the texture)
