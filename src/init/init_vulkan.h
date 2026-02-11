@@ -2,7 +2,7 @@
 #define INITH
 
 
-#ifdef WINDOWS
+#ifdef _WIN32
 #include "Volk/volk.h"
 #else
 #include "volk/volk.h"

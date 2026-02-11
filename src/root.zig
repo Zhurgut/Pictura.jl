@@ -8,10 +8,7 @@ pub const sdl = @cImport({
     @cInclude("SDL3/SDL_vulkan.h");
 });
 
-pub const vulkan = if (builtin.os.tag == .windows) @cImport({
-    @cDefine("WINDOWS", {});
-    @cInclude("src/init/init_vulkan.h");
-}) else @cImport({
+pub const vulkan = @cImport({
     @cInclude("src/init/init_vulkan.h");
 });
 
