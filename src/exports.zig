@@ -265,6 +265,53 @@ pub export fn draw_rect(
     return 0;
 }
 
+pub export fn draw_full_image(dst: Image, src: Image, use_nearest_sampling: i32) u32 {
+    root.image.draw_full_img(
+        @ptrCast(@alignCast(dst)),
+        @ptrCast(@alignCast(src)),
+        root.pictura_app.pipelines.draw_full_img_pipeline,
+        &root.pictura_app,
+        use_nearest_sampling != 0,
+    ) catch |e| {
+        return @intFromError(e);
+    };
+    return 0;
+}
+
+pub export fn draw_image(
+    dst: Image,
+    src: Image,
+    use_nearest_sampling: i32,
+    dst_tl_x: f32,
+    dst_tl_y: f32,
+    dst_tr_x: f32,
+    dst_tr_y: f32,
+    dst_bl_x: f32,
+    dst_bl_y: f32,
+    dst_br_x: f32,
+    dst_br_y: f32,
+    src_tl_x: f32,
+    src_tl_y: f32,
+    src_tr_x: f32,
+    src_tr_y: f32,
+    src_bl_x: f32,
+    src_bl_y: f32,
+    src_br_x: f32,
+    src_br_y: f32,
+) u32 {
+    root.image.draw_img(
+        @ptrCast(@alignCast(dst)),
+        @ptrCast(@alignCast(src)),
+        &root.pictura_app,
+        [8]f32{ dst_tl_x, dst_tl_y, dst_tr_x, dst_tr_y, dst_bl_x, dst_bl_y, dst_br_x, dst_br_y },
+        [8]f32{ src_tl_x, src_tl_y, src_tr_x, src_tr_y, src_bl_x, src_bl_y, src_br_x, src_br_y },
+        use_nearest_sampling != 0,
+    ) catch |e| {
+        return @intFromError(e);
+    };
+    return 0;
+}
+
 pub export fn get_mouse_x() f32 {
     return root.pictura_app.event_handler.mouse.x;
 }

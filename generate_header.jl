@@ -33,12 +33,16 @@ function translate_type(s)
         "int32_t"
     elseif s == "[*:0]const u8"
         "const char*"
+    elseif s == "?[*][*:0]const u8"
+        "const char**"
     elseif s == "Image"
         "Image"
     elseif s == "?Image"
         "Image"
     elseif s == "void"
         "void"
+    elseif s == "?*anyopaque"
+        "void*"
     elseif s == "callconv(.c) void"
         "void"
     elseif s == "[*]u32"
@@ -99,6 +103,7 @@ function translate_function(f)
 end
 
 function main()
+    cd(@__DIR__)
     in = open("src/exports.zig", "r")
     sin = read(in, String)
     close(in)
