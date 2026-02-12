@@ -183,6 +183,7 @@ function write_jl_module(out, constants, functions)
             for a in f.args
                 if a.type == "*const fn"
                     args = join(["$(translate_type(a.type, true))" for a in a.fn_arg.args], ", ") * ","
+                    write(out, "# args: $(join(["$(a.name)::$(translate_type(a.type, true))" for a in a.fn_arg.args], ", "))\n")
                     write(out, "# $(a.name) = @cfunction(your_julia_function, $(translate_type(a.fn_arg.return_type, true)), ($(args)))\n")
                 end
             end
@@ -236,7 +237,7 @@ function main()
     write_c_header(c_header, constants, functions)
     close(c_header)
 
-    jl_module = open("zig-out/lib/picturalib.jl", "w")
+    jl_module = open("../src/picturalib.jl", "w")
     write_jl_module(jl_module, constants, functions)
     close(jl_module)
     

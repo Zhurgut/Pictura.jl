@@ -1,0 +1,489 @@
+
+module PicturaLib
+
+const DELETE = 127
+const RIGHT = 128
+const LEFT = 129
+const DOWN = 130
+const UP = 131
+const SHIFT = 132
+const CTRL = 133
+const ALT = 134
+const HOME = 135
+const END = 136
+const PAGEUP = 137
+const PAGEDOWN = 138
+const INSERT = 139
+
+lib = joinpath(@__DIR__, "libpictura")
+
+function error_string(err)
+    @ccall lib.error_string(
+		err::UInt32
+	)::Cstring
+end
+
+function init(w, h)
+    err = @ccall lib.init(
+		w::UInt32,
+		h::UInt32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function get_frametime()
+    @ccall lib.get_frametime()::Float64
+end
+
+function set_framerate(f)
+    @ccall lib.set_framerate(
+		f::Float64
+	)::Float64
+end
+
+function get_canvas()
+    @ccall lib.get_canvas()::Ptr{Cvoid}
+end
+
+function draw_background(image, r, g, b, a)
+    err = @ccall lib.draw_background(
+		image::Ptr{Cvoid},
+		r::Float32,
+		g::Float32,
+		b::Float32,
+		a::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function wait_until_next_frame()
+    @ccall lib.wait_until_next_frame()::Cvoid
+end
+
+function handle_events()
+    err = @ccall lib.handle_events()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function present()
+    err = @ccall lib.present()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function delay(ns)
+    @ccall lib.delay(
+		ns::UInt64
+	)::Cvoid
+end
+
+function quit()
+    @ccall lib.quit()::Cvoid
+end
+
+function create_image(w, h)
+    @ccall lib.create_image(
+		w::UInt32,
+		h::UInt32
+	)::Ptr{Cvoid}
+end
+
+function create_image_from_pixels(w, h, srcpixels)
+    @ccall lib.create_image_from_pixels(
+		w::UInt32,
+		h::UInt32,
+		srcpixels::Ptr{UInt32}
+	)::Ptr{Cvoid}
+end
+
+function destroy_image(image)
+    @ccall lib.destroy_image(
+		image::Ptr{Cvoid}
+	)::Cvoid
+end
+
+function load_pixels(image)
+    @ccall lib.load_pixels(
+		image::Ptr{Cvoid}
+	)::Ptr{UInt32}
+end
+
+function update_pixels(image)
+    err = @ccall lib.update_pixels(
+		image::Ptr{Cvoid}
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function draw_point(image, x, y, r, g, b, a, stroke_radius)
+    err = @ccall lib.draw_point(
+		image::Ptr{Cvoid},
+		x::Float32,
+		y::Float32,
+		r::Float32,
+		g::Float32,
+		b::Float32,
+		a::Float32,
+		stroke_radius::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function draw_line(image, x1, y1, x2, y2, r, g, b, a, stroke_radius, tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y)
+    err = @ccall lib.draw_line(
+		image::Ptr{Cvoid},
+		x1::Float32,
+		y1::Float32,
+		x2::Float32,
+		y2::Float32,
+		r::Float32,
+		g::Float32,
+		b::Float32,
+		a::Float32,
+		stroke_radius::Float32,
+		tl_x::Float32,
+		tl_y::Float32,
+		tr_x::Float32,
+		tr_y::Float32,
+		bl_x::Float32,
+		bl_y::Float32,
+		br_x::Float32,
+		br_y::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function draw_ellipse(image, radius_x, radius_y, fill_r, fill_g, fill_b, fill_a, stroke_r, stroke_g, stroke_b, stroke_a, stroke_radius, tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y)
+    err = @ccall lib.draw_ellipse(
+		image::Ptr{Cvoid},
+		radius_x::Float32,
+		radius_y::Float32,
+		fill_r::Float32,
+		fill_g::Float32,
+		fill_b::Float32,
+		fill_a::Float32,
+		stroke_r::Float32,
+		stroke_g::Float32,
+		stroke_b::Float32,
+		stroke_a::Float32,
+		stroke_radius::Float32,
+		tl_x::Float32,
+		tl_y::Float32,
+		tr_x::Float32,
+		tr_y::Float32,
+		bl_x::Float32,
+		bl_y::Float32,
+		br_x::Float32,
+		br_y::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function draw_rect(image, w, h, corner_radius, fill_r, fill_g, fill_b, fill_a, stroke_r, stroke_g, stroke_b, stroke_a, stroke_radius, tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y)
+    err = @ccall lib.draw_rect(
+		image::Ptr{Cvoid},
+		w::Float32,
+		h::Float32,
+		corner_radius::Float32,
+		fill_r::Float32,
+		fill_g::Float32,
+		fill_b::Float32,
+		fill_a::Float32,
+		stroke_r::Float32,
+		stroke_g::Float32,
+		stroke_b::Float32,
+		stroke_a::Float32,
+		stroke_radius::Float32,
+		tl_x::Float32,
+		tl_y::Float32,
+		tr_x::Float32,
+		tr_y::Float32,
+		bl_x::Float32,
+		bl_y::Float32,
+		br_x::Float32,
+		br_y::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function draw_full_image(dst, src, use_nearest_sampling)
+    err = @ccall lib.draw_full_image(
+		dst::Ptr{Cvoid},
+		src::Ptr{Cvoid},
+		use_nearest_sampling::Int32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function draw_image(dst, src, use_nearest_sampling, dst_tl_x, dst_tl_y, dst_tr_x, dst_tr_y, dst_bl_x, dst_bl_y, dst_br_x, dst_br_y, src_tl_x, src_tl_y, src_tr_x, src_tr_y, src_bl_x, src_bl_y, src_br_x, src_br_y)
+    err = @ccall lib.draw_image(
+		dst::Ptr{Cvoid},
+		src::Ptr{Cvoid},
+		use_nearest_sampling::Int32,
+		dst_tl_x::Float32,
+		dst_tl_y::Float32,
+		dst_tr_x::Float32,
+		dst_tr_y::Float32,
+		dst_bl_x::Float32,
+		dst_bl_y::Float32,
+		dst_br_x::Float32,
+		dst_br_y::Float32,
+		src_tl_x::Float32,
+		src_tl_y::Float32,
+		src_tr_x::Float32,
+		src_tr_y::Float32,
+		src_bl_x::Float32,
+		src_bl_y::Float32,
+		src_br_x::Float32,
+		src_br_y::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function get_mouse_x()
+    @ccall lib.get_mouse_x()::Float32
+end
+
+function get_mouse_y()
+    @ccall lib.get_mouse_y()::Float32
+end
+
+function get_mouse_state(x, y, x_prev, y_prev, left, middle, right)
+    @ccall lib.get_mouse_state(
+		x::Ptr{Float32},
+		y::Ptr{Float32},
+		x_prev::Ptr{Float32},
+		y_prev::Ptr{Float32},
+		left::Ptr{Int32},
+		middle::Ptr{Int32},
+		right::Ptr{Int32}
+	)::Cvoid
+end
+
+function is_key_pressed(key)
+    @ccall lib.is_key_pressed(
+		key::UInt8
+	)::Int32
+end
+
+function set_mouse_position(x, y)
+    @ccall lib.set_mouse_position(
+		x::Float32,
+		y::Float32
+	)::Cvoid
+end
+
+# args: x::Float32, y::Float32, button::UInt32
+# f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, UInt32,))
+function set_mouse_pressed_fn(f)
+    @ccall lib.set_mouse_pressed_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+# args: x::Float32, y::Float32, button::UInt32
+# f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, UInt32,))
+function set_mouse_released_fn(f)
+    @ccall lib.set_mouse_released_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+# args: vert::Float32, hori::Float32
+# f = @cfunction(your_julia_function, Cvoid, (Float32, Float32,))
+function set_mouse_wheel_fn(f)
+    @ccall lib.set_mouse_wheel_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+# args: x_prev::Float32, y_prev::Float32, x::Float32, y::Float32
+# f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, Float32, Float32,))
+function set_mouse_moved_fn(f)
+    @ccall lib.set_mouse_moved_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+# args: x_prev::Float32, y_prev::Float32, x::Float32, y::Float32
+# f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, Float32, Float32,))
+function set_mouse_dragged_fn(f)
+    @ccall lib.set_mouse_dragged_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+# args: key::UInt8, shift::Int32, ctrl::Int32, alt::Int32
+# f = @cfunction(your_julia_function, Cvoid, (UInt8, Int32, Int32, Int32,))
+function set_key_pressed_fn(f)
+    @ccall lib.set_key_pressed_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+# args: key::UInt8, shift::Int32, ctrl::Int32, alt::Int32
+# f = @cfunction(your_julia_function, Cvoid, (UInt8, Int32, Int32, Int32,))
+function set_key_released_fn(f)
+    @ccall lib.set_key_released_fn(
+		f::Ptr{Cvoid}
+	)::Cvoid
+end
+
+function get_display_refresh_rate()
+    @ccall lib.get_display_refresh_rate()::Float32
+end
+
+function get_display_size(w, h)
+    err = @ccall lib.get_display_size(
+		w::Ptr{UInt32},
+		h::Ptr{UInt32}
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function get_window_position(w, h)
+    err = @ccall lib.get_window_position(
+		w::Ptr{Int32},
+		h::Ptr{Int32}
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function set_window_position(x, y)
+    err = @ccall lib.set_window_position(
+		x::Int32,
+		y::Int32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function set_fullscreen()
+    err = @ccall lib.set_fullscreen()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function set_windowed()
+    err = @ccall lib.set_windowed()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function get_window_size(w, h)
+    @ccall lib.get_window_size(
+		w::Ptr{UInt32},
+		h::Ptr{UInt32}
+	)::Cvoid
+end
+
+function set_window_size(w, h)
+    err = @ccall lib.set_window_size(
+		w::UInt32,
+		h::UInt32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function set_bordered()
+    err = @ccall lib.set_bordered()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function set_borderless()
+    err = @ccall lib.set_borderless()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function grab_mouse()
+    err = @ccall lib.grab_mouse()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function release_mouse()
+    err = @ccall lib.release_mouse()::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+
+end

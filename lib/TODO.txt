@@ -1,0 +1,31 @@
+
+
+
+masked draw, both image and mask have position rect
+
+planned features
+expose window resized function so user can resize their stuff as well
+
+decouple size of canvas from size of window, so we can fix aspect ratio (draw canvas as big as possible on black background)
+
+proper hdpi handling,  hdpi on-> twice as large window, pretend window is actually only half the size?
+or same size window, but twice as big backbuffer (and canvas and swapchain), need to verify with sdl whether backbuffer is actually twice as large
+
+expose is_running() function or something
+
+
+more draw shapes
+quad, triangle, arc, bezier line from points, convex polygon?
+more efficient versions, draw points, draw_lines, draw_ellipses... 
+
+font rendering
+change cursor image
+
+export more vulkan utilities
+
+play music and sounds
+controller input
+
+print all available gpus and let the user pass an index to choose which one to use
+
+make quit(), (and destroy_image(), ...?),  idempotent
