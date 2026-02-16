@@ -21,7 +21,7 @@ pub export fn get_frametime() f64 {
 }
 
 pub export fn set_framerate(f: f64) f64 {
-    const fr = std.math.clamp(f, 1e-6, 2000);
+    const fr = std.math.clamp(f, 0.1, 2000);
     root.pictura_app.target_framerate = @floatCast(fr);
     return root.pictura_app.target_framerate;
 }
@@ -30,15 +30,15 @@ pub export fn get_canvas() Image {
     return &root.pictura_app.canvas;
 }
 
+pub export fn wait_until_next_frame() void {
+    root.pictura_app.wait_until_next_frame();
+}
+
 pub export fn draw_background(image: Image, r: f32, g: f32, b: f32, a: f32) ErrorCode {
     root.image.draw_background(@ptrCast(@alignCast(image)), r, g, b, a, &root.pictura_app) catch |e| {
         return @intFromError(e);
     };
     return 0;
-}
-
-pub export fn wait_until_next_frame() void {
-    root.pictura_app.wait_until_next_frame();
 }
 
 pub export fn handle_events() ErrorCode {
@@ -59,12 +59,16 @@ pub export fn delay(ns: u64) void {
     root.sdl.SDL_DelayNS(ns);
 }
 
+pub export fn window_close_requested() i32 {
+    return @intFromBool(root.pictura_app.running == false);
+}
+
 pub export fn quit() void {
     root.init.quit();
 }
 
 pub export fn create_image(w: u32, h: u32) ?Image {
-    const image = root.image.PicturaImage.create(
+    var image = root.image.PicturaImage.create(
         w,
         h,
         root.pictura_app.device,
@@ -75,6 +79,7 @@ pub export fn create_image(w: u32, h: u32) ?Image {
     };
 
     const image_ptr = root.pictura_app.gpa.create(root.image.PicturaImage) catch {
+        image.destroy(root.pictura_app.device, root.pictura_app.descriptor_pool);
         return null;
     };
 
@@ -84,7 +89,7 @@ pub export fn create_image(w: u32, h: u32) ?Image {
 }
 
 pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?Image {
-    const image = root.image.PicturaImage.from_pixels(
+    var image = root.image.PicturaImage.from_pixels(
         w,
         h,
         srcpixels,
@@ -94,6 +99,7 @@ pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?Image
     };
 
     const image_ptr = root.pictura_app.gpa.create(root.image.PicturaImage) catch {
+        image.destroy(root.pictura_app.device, root.pictura_app.descriptor_pool);
         return null;
     };
 

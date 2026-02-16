@@ -56,6 +56,10 @@ function get_canvas()
     @ccall lib.get_canvas()::Ptr{Cvoid}
 end
 
+function wait_until_next_frame()
+    @ccall lib.wait_until_next_frame()::Cvoid
+end
+
 function draw_background(image, r, g, b, a)
     err = @ccall lib.draw_background(
 		image::Ptr{Cvoid},
@@ -69,10 +73,6 @@ function draw_background(image, r, g, b, a)
         error(s)
     end
     nothing
-end
-
-function wait_until_next_frame()
-    @ccall lib.wait_until_next_frame()::Cvoid
 end
 
 function handle_events()
@@ -97,6 +97,10 @@ function delay(ns)
     @ccall lib.delay(
 		ns::UInt64
 	)::Cvoid
+end
+
+function window_close_requested()
+    @ccall lib.window_close_requested()::Int32
 end
 
 function quit()
@@ -323,7 +327,7 @@ function set_mouse_position(x, y)
 	)::Cvoid
 end
 
-# args: x::Float32, y::Float32, button::UInt32
+# your_julia_function(x::Float32, y::Float32, button::UInt32)
 # f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, UInt32,))
 function set_mouse_pressed_fn(f)
     @ccall lib.set_mouse_pressed_fn(
@@ -331,7 +335,7 @@ function set_mouse_pressed_fn(f)
 	)::Cvoid
 end
 
-# args: x::Float32, y::Float32, button::UInt32
+# your_julia_function(x::Float32, y::Float32, button::UInt32)
 # f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, UInt32,))
 function set_mouse_released_fn(f)
     @ccall lib.set_mouse_released_fn(
@@ -339,7 +343,7 @@ function set_mouse_released_fn(f)
 	)::Cvoid
 end
 
-# args: vert::Float32, hori::Float32
+# your_julia_function(vert::Float32, hori::Float32)
 # f = @cfunction(your_julia_function, Cvoid, (Float32, Float32,))
 function set_mouse_wheel_fn(f)
     @ccall lib.set_mouse_wheel_fn(
@@ -347,7 +351,7 @@ function set_mouse_wheel_fn(f)
 	)::Cvoid
 end
 
-# args: x_prev::Float32, y_prev::Float32, x::Float32, y::Float32
+# your_julia_function(x_prev::Float32, y_prev::Float32, x::Float32, y::Float32)
 # f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, Float32, Float32,))
 function set_mouse_moved_fn(f)
     @ccall lib.set_mouse_moved_fn(
@@ -355,7 +359,7 @@ function set_mouse_moved_fn(f)
 	)::Cvoid
 end
 
-# args: x_prev::Float32, y_prev::Float32, x::Float32, y::Float32
+# your_julia_function(x_prev::Float32, y_prev::Float32, x::Float32, y::Float32)
 # f = @cfunction(your_julia_function, Cvoid, (Float32, Float32, Float32, Float32,))
 function set_mouse_dragged_fn(f)
     @ccall lib.set_mouse_dragged_fn(
@@ -363,7 +367,7 @@ function set_mouse_dragged_fn(f)
 	)::Cvoid
 end
 
-# args: key::UInt8, shift::Int32, ctrl::Int32, alt::Int32
+# your_julia_function(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
 # f = @cfunction(your_julia_function, Cvoid, (UInt8, Int32, Int32, Int32,))
 function set_key_pressed_fn(f)
     @ccall lib.set_key_pressed_fn(
@@ -371,7 +375,7 @@ function set_key_pressed_fn(f)
 	)::Cvoid
 end
 
-# args: key::UInt8, shift::Int32, ctrl::Int32, alt::Int32
+# your_julia_function(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
 # f = @cfunction(your_julia_function, Cvoid, (UInt8, Int32, Int32, Int32,))
 function set_key_released_fn(f)
     @ccall lib.set_key_released_fn(
