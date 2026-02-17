@@ -222,6 +222,7 @@ pub fn init_app(
         .swapchain = swapchain2,
         .command_pool = command_pool,
         .canvas = canvas,
+        .canvas_id = 1,
         .well = well,
         .descriptor_pool = descriptor_pool,
         .pipelines = pipelines,

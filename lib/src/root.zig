@@ -40,6 +40,7 @@ pub const PicturaApp = struct {
     swapchain: swapchain.Swapchain,
     command_pool: vulkan.VkCommandPool,
     canvas: image.PicturaImage,
+    canvas_id: i64,
     well: WellOfCommands,
     descriptor_pool: vulkan.VkDescriptorPool,
     pipelines: pipelines.Pipelines,
@@ -109,6 +110,7 @@ pub const PicturaApp = struct {
         app.canvas.destroy(app.device, app.descriptor_pool);
 
         app.canvas = new_canvas;
+        app.canvas_id = app.canvas_id + 1;
         app.swapchain = swapchain2;
     }
 };

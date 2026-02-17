@@ -30,6 +30,10 @@ pub export fn get_canvas() Image {
     return &root.pictura_app.canvas;
 }
 
+pub export fn get_canvas_id() i64 {
+    return root.pictura_app.canvas_id;
+}
+
 pub export fn wait_until_next_frame() void {
     root.pictura_app.wait_until_next_frame();
 }
