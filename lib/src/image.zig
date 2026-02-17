@@ -335,7 +335,6 @@ pub fn draw_full_img(dst: *PicturaImage, src: *PicturaImage, pipeline: vulkan.Vk
     if (src == dst) {
         return error.src_cant_equal_dst;
     }
-    std.debug.assert(src.w == dst.w and src.h == dst.h);
 
     var command_buffer = try app.well.record(app.device);
 
