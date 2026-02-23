@@ -56,6 +56,10 @@ function get_canvas()
     @ccall lib.get_canvas()::Ptr{Cvoid}
 end
 
+function get_canvas_id()
+    @ccall lib.get_canvas_id()::Int64
+end
+
 function wait_until_next_frame()
     @ccall lib.wait_until_next_frame()::Cvoid
 end

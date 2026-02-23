@@ -26,7 +26,6 @@ function quit()
     app.is_initialized = false
 end
 
-framerate() = 1 / PicturaLib.get_frametime()
 function framerate(f)
     t = PicturaLib.set_framerate(Float64(f))
     if t != f
@@ -35,12 +34,7 @@ function framerate(f)
 end
 
 function get_canvas_ptr()
-    p = PicturaLib.get_canvas()
-    if p != C_NULL
-        return p
-    else
-        error("failed to get pointer to canvas")
-    end
+    return PicturaLib.get_canvas() # always returns the same address
 end
 
 function draw_background(img::Image, c::Color)
@@ -94,7 +88,7 @@ function draw_segment(img::Image, s::Segment, c::Color, stroke_radius)
     b = Rect{Float32}(bounding_box(fs, stroke_radius+1))
     crs = corners(b)
     PicturaLib.draw_line(
-        img.ptr, fs.p1.x, fs.p1.x, fs.p2.x, fs.p2.y, 
+        img.ptr, fs.p1.x, fs.p1.y, fs.p2.x, fs.p2.y, 
         f.r, f.g, f.b, f.a, Float32(stroke_radius), 
         crs.tl.x, crs.tl.y, crs.tr.x, crs.tr.y, crs.bl.x, crs.bl.y, crs.br.x, crs.br.y
     )
@@ -177,6 +171,8 @@ let data = Vector{Int32}(undef, 7)
             l = Bool(data[5]),
             m = Bool(data[6]),
             r = Bool(data[7]),
+            x = reinterpret(Float32, data[1]),
+            y = reinterpret(Float32, data[2]),
             pos = Point(reinterpret(Float32, data[1]), reinterpret(Float32, data[2])),
             prev = Point(reinterpret(Float32, data[3]), reinterpret(Float32, data[4])),
         )

@@ -1,6 +1,9 @@
 module Pictura
 
 export setup, color, @drawloop
+export strokecolor, fillcolor, mouse, noloop, framerate, framecount
+export loadpixels, updatepixels, pixels, width, height
+
 
 using PShapes
 
@@ -18,49 +21,69 @@ mutable struct Image
     h::UInt32
     ptr::Ptr{Cvoid}
     pixel_ptr::Union{Ptr{UInt32}, Nothing}
+    pixel_array::Union{Matrix{Color}, Nothing}
 end
 
-Image(w, h, ptr::Ptr{Cvoid}) = Image(w, h, ptr, nothing)
+Image(w, h, ptr::Ptr{Cvoid}) = Image(w, h, ptr, nothing, nothing)
 
-
+include("image.jl")
 
 
 
 
 mutable struct App
+    canvas_id::Int
     canvas::Image
     stroke::Color
     fill::Color
     framecount::UInt
     is_initialized::Bool
     is_looping::Bool
-    mouse::@NamedTuple{l::Bool, m::Bool, r::Bool, pos::PShapes.Point{Float32}, prev::PShapes.Point{Float32}}
+    mouse::@NamedTuple{l::Bool, m::Bool, r::Bool, x::Float32, y::Float32, pos::PShapes.Point{Float32}, prev::PShapes.Point{Float32}}
+    frametimes::NTuple{5, Float64}
 end
 
 App() = App(
-    Image(0,0,C_NULL), 
+    0,
+    Image(0,0, C_NULL), 
     color(0, 109, 156),
     color(12, 194, 235),
     0,
     false,
     true,
-    (l=false, m=false, r=false, pos=Point{Float32}(0.0f0, 0.0f0), prev=Point{Float32}(0.0f0, 0.0f0))
+    (l=false, m=false, r=false, x=0.0f0, y=0.0f0, pos=Point{Float32}(0.0f0, 0.0f0), prev=Point{Float32}(0.0f0, 0.0f0)),
+    (0.0, 0.0, 0.0, 0.0, 0.0)
 )
 
 app::App = App()
 
 
-include("core.jl")
 
+include("core.jl")
 
 
 has_stroke() = alpha(app.stroke) > 0
 has_fill()   = alpha(app.fill) > 0
 
-stroke_color() = app.stroke
-stroke_color(c::Color) = app.stroke = c
+strokecolor() = app.stroke
+strokecolor(c::Color) = app.stroke = c
 fillcolor() = app.fill
 fillcolor(c::Color) = app.fill = c
+
+width() = width(app.canvas)
+height() = height(app.canvas)
+
+loadpixels() = loadpixels(app.canvas)
+updatepixels() = updatepixels(app.canvas)
+pixels() = pixels(app.canvas)
+
+noloop() = app.is_looping = false
+
+mouse() = app.mouse
+
+framerate() = length(app.frametimes) / sum(app.frametimes)
+framecount() = app.framecount
+
 
 
 
@@ -70,21 +93,25 @@ function before_rendering()
     PicturaLib.handle_events()
 
     app.canvas.w, app.canvas.h = get_window_size()
-    new_ptr = get_canvas_ptr()
-    if app.canvas.ptr != new_ptr
-        app.canvas.ptr = new_ptr
+    id = PicturaLib.get_canvas_id()
+    if app.canvas_id != id
+        app.canvas_id = id
         app.canvas.pixel_ptr = nothing
+        app.canvas.pixel_array = nothing
     end
 
     app.mouse = get_mouse_state()
 
-    # set global canvas, global mouseX and stuff
+    app.framecount += 1
+
+    app.frametimes = (PicturaLib.get_frametime(), app.frametimes[1:end-1]...)
 end
 
 function after_rendering()
     PicturaLib.present()
 end
 
+public render_present
 function render_present()
     after_rendering()
     before_rendering() 
@@ -94,21 +121,13 @@ end
 Base.size(w::Integer, h::Integer) = (UInt32(w), UInt32(h))
 
 
-noloop() = app.is_looping = false
+
 
 function setup(size::Tuple{UInt32, UInt32}; borderless = false, fullscreen = false)
     w,h = size
     init(w, h)
-
-    try 
-        before_rendering()
-
-        app.is_looping = true
-    catch e
-        quit()
-        rethrow(e)
-    end
-
+    app.canvas.ptr = get_canvas_ptr()
+    app.is_looping = true
 end
 
 
@@ -116,17 +135,18 @@ end
 macro drawloop(expr)
     return quote
         try 
+            before_rendering()
+
             while app.is_looping
-                before_rendering()
 
                 if window_close_requested()
                     noloop()
                     continue
                 end
 
-                $expr
+                $(esc(expr))
 
-                after_rendering()
+                render_present()
             end
             quit()
         catch e
@@ -140,3 +160,9 @@ end
 
 
 end # module Pictura
+
+
+
+
+
+
