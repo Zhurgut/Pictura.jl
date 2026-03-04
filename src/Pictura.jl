@@ -4,8 +4,12 @@ export setup, color, @drawloop
 export strokecolor, fillcolor, mouse, noloop, framerate, framecount
 export loadpixels, updatepixels, pixels, width, height
 
+export @mousepressed , @mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
 
-using PShapes
+Base.map(x::Real, a::Real, b::Real, A::Real, B::Real) = fma(x, B-A, fma(A, b, -B*a)) * (1 / (b-a))
+
+
+using PicturaShapes
 
 
 struct Color
@@ -39,7 +43,7 @@ mutable struct App
     framecount::UInt
     is_initialized::Bool
     is_looping::Bool
-    mouse::@NamedTuple{l::Bool, m::Bool, r::Bool, x::Float32, y::Float32, pos::PShapes.Point{Float32}, prev::PShapes.Point{Float32}}
+    mouse::@NamedTuple{l::Bool, m::Bool, r::Bool, x::Float32, y::Float32, pos::Point{Float32}, prev::Point{Float32}}
     frametimes::NTuple{5, Float64}
 end
 
@@ -57,6 +61,8 @@ App() = App(
 
 app::App = App()
 
+include("callbacks.jl")
+using .Callbacks
 
 
 include("core.jl")
@@ -67,8 +73,15 @@ has_fill()   = alpha(app.fill) > 0
 
 strokecolor() = app.stroke
 strokecolor(c::Color) = app.stroke = c
+strokecolor(x) = strokecolor(color(x))
+strokecolor(r, g, b) = strokecolor(color(r, g, b))
+strokecolor(r, g, b, a) = strokecolor(color(r, g, b, a))
+
 fillcolor() = app.fill
 fillcolor(c::Color) = app.fill = c
+fillcolor(x) = fillcolor(color(x))
+fillcolor(r, g, b) = fillcolor(color(r, g, b))
+fillcolor(r, g, b, a) = fillcolor(color(r, g, b, a))
 
 width() = width(app.canvas)
 height() = height(app.canvas)
@@ -126,6 +139,7 @@ Base.size(w::Integer, h::Integer) = (UInt32(w), UInt32(h))
 function setup(size::Tuple{UInt32, UInt32}; borderless = false, fullscreen = false)
     w,h = size
     init(w, h)
+    Callbacks.set_default_callbacks()
     app.canvas.ptr = get_canvas_ptr()
     app.is_looping = true
 end

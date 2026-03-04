@@ -6,13 +6,11 @@ function init(w, h)
     if app.is_initialized
         error("Pictura is already initialized")
     end
-
-    PicturaLib.init(UInt32(w), UInt32(h))
-    set_default_callbacks()
-
     app = App()
     app.is_initialized = true
 
+    PicturaLib.init(UInt32(w), UInt32(h))
+    
 end
 
 function quit()
@@ -47,7 +45,8 @@ window_close_requested() = PicturaLib.window_close_requested() |> Bool
 
 function create_image(w, h)
     img = Image(UInt32(w), UInt32(h), PicturaLib.create_image(UInt32(w), UInt32(h)))
-    finalizer(img) do x
+    finalizer(img) do x # TODO, what if this finalizer wont run only until after we have shut down the application? hm? what then? 
+        # segfaults, crashes, application hangs, ...
         PicturaLib.destroy_image(x.ptr)
     end
 end
@@ -61,7 +60,8 @@ function create_image(pixels::Matrix{Color})
     end
     img = Image(UInt32(w), UInt32(h), img_ptr)
 
-    finalizer(img) do x
+    finalizer(img) do x # TODO, what if this finalizer wont run only until after we have shut down the application? hm? what then? 
+        # segfaults, crashes, application hangs, ...
         PicturaLib.destroy_image(x.ptr)
     end
 end
@@ -187,72 +187,3 @@ end
 
 is_key_pressed(key) = PicturaLib.is_key_pressed(UInt8(key)) |> Bool
 
-
-
-function mouse_pressed_fn(x::Float32, y::Float32, button::UInt32)
-    @invokelatest on_mouse_pressed(x, y, button)
-    Cvoid
-end
-c_mouse_pressed_fn = @cfunction(mouse_pressed_fn, Cvoid, (Float32, Float32, UInt32,))
-
-
-function mouse_released_fn(x::Float32, y::Float32, button::UInt32)
-    @invokelatest on_mouse_released(x, y, button)
-    Cvoid
-end
-c_mouse_released_fn = @cfunction(mouse_released_fn, Cvoid, (Float32, Float32, UInt32,))
-
-
-function mouse_wheel_fn(vert::Float32, hori::Float32)
-    @invokelatest on_mouse_wheel(vert, hori)
-    Cvoid
-end
-c_mouse_wheel_fn = @cfunction(mouse_wheel_fn, Cvoid, (Float32, Float32))
-
-
-function mouse_moved_fn(x_prev::Float32, y_prev::Float32, x::Float32, y::Float32)
-    @invokelatest on_mouse_moved(x_prev, y_prev, x, y)
-    Cvoid
-end
-c_mouse_moved_fn = @cfunction(mouse_moved_fn, Cvoid, (Float32, Float32, Float32, Float32,))
-
-
-function mouse_dragged_fn(x_prev::Float32, y_prev::Float32, x::Float32, y::Float32)
-    @invokelatest on_mouse_dragged(x_prev, y_prev, x, y)
-    Cvoid
-end
-c_mouse_dragged_fn = @cfunction(mouse_dragged_fn, Cvoid, (Float32, Float32, Float32, Float32,))
-
-
-function key_pressed_fn(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
-    @invokelatest on_key_pressed(key, Bool(shift), Bool(ctrl), Bool(alt))
-    Cvoid
-end
-c_key_pressed_fn = @cfunction(key_pressed_fn, Cvoid, (UInt8, Int32, Int32, Int32,))
-
-
-function key_released_fn(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
-    @invokelatest on_key_released(key, Bool(shift), Bool(ctrl), Bool(alt))
-    Cvoid
-end
-c_key_released_fn = @cfunction(key_released_fn, Cvoid, (UInt8, Int32, Int32, Int32,))
-
-function set_default_callbacks()
-    eval(quote
-        on_mouse_pressed(x, y, b) = nothing
-        on_mouse_released(x, y, b) = nothing
-        on_mouse_wheel(v, h) = nothing
-        on_mouse_moved(px, py, x, y) = nothing
-        on_mouse_dragged(px, py, x, y) = nothing
-        on_key_pressed(k, s, c, a) = nothing
-        on_key_released(k, s, c, a) = nothing
-    end)
-
-    PicturaLib.set_mouse_pressed_fn(c_mouse_pressed_fn)
-    PicturaLib.set_mouse_released_fn(c_mouse_released_fn)
-    PicturaLib.set_mouse_wheel_fn(c_mouse_wheel_fn)
-    PicturaLib.set_mouse_moved_fn(c_mouse_moved_fn)
-    PicturaLib.set_mouse_dragged_fn(c_mouse_dragged_fn)
-    PicturaLib.set_key_pressed_fn(c_key_pressed_fn)
-    PicturaLib.set_key_released_fn(c_key_released_fn)
-end
