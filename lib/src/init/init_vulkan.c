@@ -67,7 +67,7 @@ VkResult create_physical_device(VkPhysicalDevice* p_physical_device, uint32_t de
 
     *p_physical_device = devices[device_index];
 
-    VkPhysicalDeviceProperties2 props;
+    VkPhysicalDeviceProperties2 props = {0};
     props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     vkGetPhysicalDeviceProperties2(*p_physical_device, &props);
 
@@ -111,7 +111,7 @@ VkResult create_device(
     }
 
     if (!success) {
-        CHECK_ELSE_RETURN(VK_ERROR_INITIALIZATION_FAILED , "didnt find a queue with all three of graphcis,compute,transfer bits");
+        CHECK_ELSE_RETURN(VK_ERROR_INITIALIZATION_FAILED , "didnt find a queue with all three of graphics, compute & transfer bits");
     }
 
   
