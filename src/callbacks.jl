@@ -6,19 +6,102 @@ using PicturaShapes
 
 export @mousepressed ,@mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
 
-const on_mouse_pressed::Ref{Function} = Ref{Function}((BUTTON) -> println("mouse pressed $(Pictura.mouse().x)"))
+
+struct MouseButton
+    value::UInt8
+end
+
+struct Key
+    value::UInt8
+end
+
+# mouse wheel button
+const CENTER = 2
+const MIDDLE = CENTER
+const WHEEL = CENTER
+const MOUSEWHEEL = CENTER
+# extra keyboard keys
+# for the others, use '+', '-', '/', ... (if these keys work for you)
+const ENTER = Int('\r')
+const BACK = Key(UInt8('\b'))
+const BACKSPACE = BACK
+const TAB = Key(UInt8('\t'))
+const SPACE = Int(' ')
+const SPACEBAR = SPACE
+const COMMA = Int(',')
+const PERIOD = Int('.')
+
+export CENTER, MIDDLE, WHEEL, MOUSEWHEEL, ENTER, BACK, BACKSPACE, TAB, SPACE, SPACEBAR, COMMA, PERIOD
+
+Base.:(==)(b, m::MouseButton) = m == b
+function Base.:(==)(m::MouseButton, b::Int)
+    if b == Pictura.PicturaLib.LEFT
+        return m.value == 1
+    elseif b == CENTER
+        return m.value == 2
+    elseif b == Pictura.PicturaLib.RIGHT
+        return m.value == 3
+    end
+    false
+end
+function Base.:(==)(m::MouseButton, b::Symbol)
+    if b == :left || b == :l
+        return m.value == 1
+    elseif b == :middle || b == :m || b == :center || b == :wheel || b == :mousewheel
+        return m.value == 2
+    elseif b == :right || b == :r
+        return m.value == 3
+    end
+    false
+end
+Base.:(==)(m::MouseButton, b::String) = m == Symbol(b)
+Base.:(==)(m::MouseButton, b::Char) = m == Symbol(b)
+
+Base.:(==)(b::Key, k::Key) = k.value == b.value
+Base.:(==)(b, k::Key) = k == b
+Base.:(==)(k::Key, b::Char) = k.value == UInt8(b)
+function Base.:(==)(k::Key, b::Int)
+    if b < 10
+        return k.value == b + Int('0')
+    end
+    return k.value == b
+end
+function Base.:(==)(k::Key, b::Symbol)
+    if b == :enter
+        return k == ENTER
+    elseif b == :back || b == :backspace
+        return k == BACK
+    elseif b == :tab
+        return k == TAB
+    elseif b == :space || b == :spacebar
+        return k == SPACE
+    elseif b == :comma
+        return k == COMMA
+    elseif b == :period
+        return k == PERIOD
+    end
+    false
+end
+Base.:(==)(k::Key, b::String) = if length(b) == 1
+        return k == Char(b[1])
+    else
+        return k == Symbol(b)
+end
+
+
+const on_mouse_pressed::Ref{Function} = Ref{Function}((BUTTON) -> nothing)
 const on_mouse_released::Ref{Function} = Ref{Function}((BUTTON) -> nothing)
 const on_mouse_wheel::Ref{Function} = Ref{Function}((WHEEL) -> nothing)
 const on_mouse_moved::Ref{Function} = Ref{Function}(() -> nothing)
 const on_mouse_dragged::Ref{Function} = Ref{Function}(() -> nothing)
-const on_key_pressed::Ref{Function} = Ref{Function}((k, s, c, a) -> println("key pressed $(Char(k))"))
+const on_key_pressed::Ref{Function} = Ref{Function}((k, s, c, a) -> nothing)
 const on_key_released::Ref{Function} = Ref{Function}((k, s, c, a) -> nothing)
 
 function mouse_pressed_fn(x::Float32, y::Float32, button::UInt32)
     m = Pictura.app.mouse
     l,md,r = m.l || button == 1, m.m || button == 2, m.r || button == 3
     Pictura.app.mouse = (l=l, m=md, r=r, x=x, y=y, pos=Point(x, y), prev=m.prev)
-    BUTTON = button # for now, TODO make a new type so we can compare BUTTON == "left", BUTTON == :l, etc.
+    BUTTON = MouseButton(UInt8(button))
     on_mouse_pressed[](BUTTON)
     nothing
 end
@@ -27,7 +110,7 @@ function mouse_released_fn(x::Float32, y::Float32, button::UInt32)
     m = Pictura.app.mouse
     l,md,r = m.l && button != 1, m.m && button != 2, m.r && button != 3
     Pictura.app.mouse = (l=l, m=md, r=r, x=x, y=y, pos=Point(x, y), prev=m.prev)
-    BUTTON = button # for now, TODO make a new type so we can compare BUTTON == "left", BUTTON == :l, etc.
+    BUTTON = MouseButton(UInt8(button))
     on_mouse_released[](BUTTON)
     nothing
 end
@@ -51,12 +134,12 @@ function mouse_dragged_fn(x_prev::Float32, y_prev::Float32, x::Float32, y::Float
 end
 
 function key_pressed_fn(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
-    on_key_pressed[](key, Bool(shift), Bool(ctrl), Bool(alt))
+    on_key_pressed[](Key(key), Bool(shift), Bool(ctrl), Bool(alt))
     nothing
 end
 
 function key_released_fn(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
-    on_key_released[](key, Bool(shift), Bool(ctrl), Bool(alt))
+    on_key_released[](Key(key), Bool(shift), Bool(ctrl), Bool(alt))
     nothing
 end
 
@@ -73,12 +156,12 @@ c_key_released_fn::Ptr{Nothing}   = 0
 
 function set_default_callbacks()
     global on_mouse_pressed, on_mouse_released, on_mouse_wheel, on_mouse_moved, on_mouse_dragged, on_key_pressed, on_key_released
-    on_mouse_pressed[] = (but) -> println("mouse pressed $x $y")
+    on_mouse_pressed[] = (but) -> nothing
     on_mouse_released[] = (but) -> nothing
     on_mouse_wheel[] = (wheel) -> nothing
     on_mouse_moved[] = () -> nothing
     on_mouse_dragged[] = () -> nothing
-    on_key_pressed[] = (k, s, c, a) -> println("key pressed $(Char(k))")
+    on_key_pressed[] = (k, s, c, a) -> nothing
     on_key_released[] = (k, s, c, a) -> nothing
 
     Pictura.PicturaLib.set_mouse_pressed_fn(c_mouse_pressed_fn)
@@ -149,7 +232,7 @@ macro mousedragged(expr)
 end
 
 macro keypressed(expr)
-    a = esc(:KEYCODE)
+    a = esc(:KEY)
     b = esc(:SHIFT)
     c = esc(:CTRL)
     d = esc(:ALT)
@@ -161,7 +244,7 @@ macro keypressed(expr)
 end
 
 macro keyreleased(expr)
-    a = esc(:KEYCODE)
+    a = esc(:KEY)
     b = esc(:SHIFT)
     c = esc(:CTRL)
     d = esc(:ALT)

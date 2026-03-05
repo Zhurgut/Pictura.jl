@@ -23,6 +23,8 @@ const END = 136
 const PAGEUP = 137
 const PAGEDOWN = 138
 const INSERT = 139
+export DELETE, RIGHT, LEFT, DOWN, UP, SHIFT, CTRL, ALT, HOME, END, PAGEUP, PAGEDOWN, INSERT
+
 
 function error_string(err)
     @ccall lib.error_string(

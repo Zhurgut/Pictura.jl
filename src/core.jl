@@ -1,6 +1,4 @@
 
-include("picturalib.jl")
-
 function init(w, h)
     global app
     if app.is_initialized
@@ -22,6 +20,7 @@ function quit()
     PicturaLib.quit()
     app = App()
     app.is_initialized = false
+    nothing
 end
 
 function framerate(f)

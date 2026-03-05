@@ -5,6 +5,12 @@ export strokecolor, fillcolor, mouse, noloop, framerate, framecount
 export loadpixels, updatepixels, pixels, width, height
 
 export @mousepressed , @mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
+export CENTER, MIDDLE, WHEEL, MOUSEWHEEL, ENTER, BACK, BACKSPACE, TAB, SPACE, SPACEBAR, COMMA, PERIOD
+
+include("picturalib.jl")
+using .PicturaLib
+
+export DELETE, RIGHT, LEFT, DOWN, UP, SHIFT, CTRL, ALT, HOME, END, PAGEUP, PAGEDOWN, INSERT
 
 Base.map(x::Real, a::Real, b::Real, A::Real, B::Real) = fma(x, B-A, fma(A, b, -B*a)) * (1 / (b-a))
 
