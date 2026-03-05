@@ -51,6 +51,7 @@ mutable struct App
     is_looping::Bool
     mouse::@NamedTuple{l::Bool, m::Bool, r::Bool, x::Float32, y::Float32, pos::Point{Float32}, prev::Point{Float32}}
     frametimes::NTuple{5, Float64}
+    images::Vector{Image}
 end
 
 App() = App(
@@ -62,7 +63,8 @@ App() = App(
     false,
     true,
     (l=false, m=false, r=false, x=0.0f0, y=0.0f0, pos=Point{Float32}(0.0f0, 0.0f0), prev=Point{Float32}(0.0f0, 0.0f0)),
-    (0.0, 0.0, 0.0, 0.0, 0.0)
+    (0.0, 0.0, 0.0, 0.0, 0.0),
+    Image[]
 )
 
 app::App = App()

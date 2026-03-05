@@ -17,6 +17,10 @@ function quit()
         error("Pictura is not initialized, so cannot quit ?! ...")
     end
 
+    for img in app.images
+        PicturaLib.destroy_image(img.ptr)
+    end
+
     PicturaLib.quit()
     app = App()
     app.is_initialized = false
@@ -43,25 +47,25 @@ window_close_requested() = PicturaLib.window_close_requested() |> Bool
 
 
 function create_image(w, h)
-    img = Image(UInt32(w), UInt32(h), PicturaLib.create_image(UInt32(w), UInt32(h)))
-    finalizer(img) do x # TODO, what if this finalizer wont run only until after we have shut down the application? hm? what then? 
-        # segfaults, crashes, application hangs, ...
-        PicturaLib.destroy_image(x.ptr)
+    if app.is_initialized
+        img = Image(UInt32(w), UInt32(h), PicturaLib.create_image(UInt32(w), UInt32(h)))
+        push!(app.images, img)
+        return img
     end
+    error("Pictura is not initialized")
 end
 
 function create_image(pixels::Matrix{Color})
-    h, w = size(pixels)
-    pixels_tr = transpose(pixels)[:, :]
-    img_ptr = PicturaLib.create_image_from_pixels(w, h, pointer(pixels_tr, 1))
-    if img_ptr == C_NULL
-        error("failed to create image")
-    end
-    img = Image(UInt32(w), UInt32(h), img_ptr)
-
-    finalizer(img) do x # TODO, what if this finalizer wont run only until after we have shut down the application? hm? what then? 
-        # segfaults, crashes, application hangs, ...
-        PicturaLib.destroy_image(x.ptr)
+    if app.is_initialized
+        h, w = size(pixels)
+        pixels_tr = transpose(pixels)[:, :]
+        img_ptr = PicturaLib.create_image_from_pixels(w, h, pointer(pixels_tr, 1))
+        if img_ptr == C_NULL
+            error("failed to create image")
+        end
+        img = Image(UInt32(w), UInt32(h), img_ptr)
+        push!(app.images, img)
+        return img
     end
 end
 
