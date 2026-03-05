@@ -79,6 +79,8 @@ function translate_type(s, julia=false)
         julia ? "Float64" : "double"
     elseif s == "u64"
         julia ? "UInt64" : "uint64_t"
+    elseif s == "i64"
+        julia ? "Int64" : "int64_t"
     elseif s == "?*f32"
         julia ? "Ptr{Float32}" : "float*"
     elseif s == "?*i32"
@@ -179,6 +181,11 @@ const lib = if isfile(dev_path) dev_path else artf_path end
     for c in constants
         write(out, "const $(c.name) = $(c.value)\n")
     end
+    write(out, "export ")
+    for c in constants[1:end-1]
+        write(out, "$(c.name), ")
+    end
+    write(out, "$(constants[end].name)\n\n")
     
     for f in functions
         
@@ -194,7 +201,7 @@ const lib = if isfile(dev_path) dev_path else artf_path end
             for a in f.args
                 if a.type == "*const fn"
                     args = join(["$(translate_type(a.type, true))" for a in a.fn_arg.args], ", ") * ","
-                    write(out, "# args: $(join(["$(a.name)::$(translate_type(a.type, true))" for a in a.fn_arg.args], ", "))\n")
+                    write(out, "# your_julia_function($(join(["$(a.name)::$(translate_type(a.type, true))" for a in a.fn_arg.args], ", ")))\n")
                     write(out, "# $(a.name) = @cfunction(your_julia_function, $(translate_type(a.fn_arg.return_type, true)), ($(args)))\n")
                 end
             end
