@@ -5,6 +5,44 @@ using ProceduralNoise
 using PicturaShapes
 
 
+@profview_allocs let
+    setup(size(800, 600))
+
+    framerate(600)
+
+    s = 1.0
+    r = 0.0
+
+    @mousedragged begin
+        s = 5(mouse().x - 0.5width()) / width()
+    end
+
+    @keypressed begin
+        if KEY == RIGHT
+            r += 0.1
+        elseif KEY == LEFT
+            r -= 0.1
+        end
+    end
+
+    @drawloop begin
+        background(255)
+        translate(width()/2, height()/2)
+        scale(s)
+        rotate(r)
+
+        strokecolor(38, 7, 79)
+        fillcolor(69, 95, 181)
+        strokewidth(4)
+
+        point(0,0)
+        segment(-100, -100, 200, -50)
+        # line(10, -100, 10, 100, infinite=true)
+        rect(30, 30, 50, 100, 10)
+        circle(-130, 30, 40)
+    end
+
+end
 
 let
     setup(size(600, 400))

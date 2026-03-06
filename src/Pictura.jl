@@ -1,13 +1,13 @@
 module Pictura
 
 export setup, color, @drawloop
-export strokecolor, fillcolor, mouse, noloop, framerate, framecount
+export mouse, noloop, framerate, framecount
 export loadpixels, updatepixels, pixels, width, height
 
 export @mousepressed , @mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
 export CENTER, MIDDLE, WHEEL, MOUSEWHEEL, ENTER, BACK, BACKSPACE, TAB, SPACE, SPACEBAR, COMMA, PERIOD
 
-include("picturalib.jl")
+include("Picturalib.jl")
 using .PicturaLib
 
 export DELETE, RIGHT, LEFT, DOWN, UP, SHIFT, CTRL, ALT, HOME, END, PAGEUP, PAGEDOWN, INSERT
@@ -45,6 +45,7 @@ mutable struct App
     canvas_id::Int
     canvas::Image
     stroke::Color
+    strokewidth::Float64
     fill::Color
     framecount::UInt
     is_initialized::Bool
@@ -58,6 +59,7 @@ App() = App(
     0,
     Image(0,0, C_NULL), 
     color(0, 109, 156),
+    1.0,
     color(12, 194, 235),
     0,
     false,
@@ -69,12 +71,13 @@ App() = App(
 
 app::App = App()
 
-include("callbacks.jl")
+include("Callbacks.jl")
 using .Callbacks
 
 
 include("core.jl")
 
+export strokecolor, fillcolor, strokewidth
 
 has_stroke() = alpha(app.stroke) > 0
 has_fill()   = alpha(app.fill) > 0
@@ -84,6 +87,9 @@ strokecolor(c::Color) = app.stroke = c
 strokecolor(x) = strokecolor(color(x))
 strokecolor(r, g, b) = strokecolor(color(r, g, b))
 strokecolor(r, g, b, a) = strokecolor(color(r, g, b, a))
+
+strokewidth(w) = app.strokewidth=abs(w)
+strokewidth() = app.strokewidth
 
 fillcolor() = app.fill
 fillcolor(c::Color) = app.fill = c
@@ -105,11 +111,58 @@ mouse() = app.mouse
 framerate() = length(app.frametimes) / sum(app.frametimes)
 framecount() = app.framecount
 
+export background
+function background(img::Image, c::Color)
+    f = floats(c, Float32)
+    PicturaLib.draw_background(img.ptr, f.r, f.g, f.b, 1.0)
+end
+background(img::Image, x) = background(img, color(x))
+background(img::Image, r, g, b) = background(img, color(r, g, b))
+background(x) = background(app.canvas, x)
+background(r, g, b) = backgroudn(app.canvas, r, g, b)
+
+
+
+include("Drawing.jl")
+
+export translate, scale, rotate
+PicturaShapes.translate(dx, dy) = Drawing.tf_translate(dx, dy)
+PicturaShapes.scale(s) = Drawing.tf_scale(s, s)
+PicturaShapes.scale(sx, sy) = Drawing.tf_scale(sx, sy)
+PicturaShapes.rotate(a) = Drawing.tf_rotate(a)
+
+
+
+export point, segment, line, rect, circle, ellipse
+
+point(img, x, y) = Drawing.draw(img, Point(x, y))
+point(x, y) = point(app.canvas, x, y)
+
+segment(img, x1, y1, x2, y2) = Drawing.draw(img, Segment(x1, y1, x2, y2))
+segment(x1, y1, x2, y2) = segment(app.canvas, x1, y1, x2, y2)
+
+line(img, x1, y1, x2, y2; infinite=false) = infinite ? Drawing.draw(img, Line(x1, y1, x2, y2)) : segment(img, x1, y1, x2, y2)
+line(x1, y1, x2, y2; infinite=false) = line(app.canvas, x1, y1, x2, y2, infinite=infinite)
+
+function rect(img::Image, x, y, w, h, corner_radius=0; angle=0, mode=:corner)
+    if angle == 0
+        Drawing.draw(img, AxisRect(x, y, w, h, mode=mode), corner_radius)
+    else
+        Drawing.draw(img, Rect(x, y, w, h, angle, mode=mode), corner_radius)
+    end
+end
+rect(x, y, w, h, corner_radius=0; angle=0, mode=:corner) = rect(app.canvas, x, y, w, h, corner_radius, angle=angle, mode=mode)
+
+circle(img, x, y, r) = Drawing.draw(img, Circle(x, y, r))
+circle(x, y, r) = circle(app.canvas, x, y, r)
+
+ellipse(img::Image, x, y, rx, ry, angle=0) = Drawing.draw(img, Ellipse(x, y, rx, ry, angle))
+ellipse(x, y, rx, ry, angle=0) = ellipse(app.canvas, x, y, rx, ry, angle)
 
 
 
 
-function before_rendering()
+function before_rendering(clear_transform)
     PicturaLib.wait_until_next_frame()
     PicturaLib.handle_events()
 
@@ -126,21 +179,25 @@ function before_rendering()
     app.framecount += 1
 
     app.frametimes = (PicturaLib.get_frametime(), app.frametimes[1:end-1]...)
+
+    if clear_transform
+        Drawing.clear_transform()
+    end
 end
 
 function after_rendering()
     PicturaLib.present()
+    
 end
 
-public render_present
-function render_present()
+
+function render_present(;clear_transform=true)
     after_rendering()
-    before_rendering() 
+    before_rendering(clear_transform) 
 end
 
 
 Base.size(w::Integer, h::Integer) = (UInt32(w), UInt32(h))
-
 
 
 
@@ -150,6 +207,7 @@ function setup(size::Tuple{UInt32, UInt32}; borderless = false, fullscreen = fal
     Callbacks.set_default_callbacks()
     app.canvas.ptr = get_canvas_ptr()
     app.is_looping = true
+    before_rendering(true)
 end
 
 
@@ -157,7 +215,6 @@ end
 macro drawloop(expr)
     return quote
         try 
-            before_rendering()
 
             while app.is_looping
 
