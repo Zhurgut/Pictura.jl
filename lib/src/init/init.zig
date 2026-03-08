@@ -205,9 +205,6 @@ pub fn init_app(
     const kb = sdl.SDL_GetKeyboardState(&numkeys);
     root.events.keyboard = kb[0..@intCast(numkeys)];
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator); // free everything at once in the end
-    errdefer arena.deinit();
-
     const now = sdl.SDL_GetTicksNS();
     const framerate = try root.sdl_utils.get_display_refresh_rate(window) - 1;
 
@@ -228,13 +225,15 @@ pub fn init_app(
         .pipelines = pipelines,
         .running = true,
         .event_handler = .create(),
-        .arena = arena,
-        .gpa = arena.allocator(),
+        .arena = .init(std.heap.page_allocator),
+        .gpa = undefined,
         .target_framerate = framerate,
         .target_time = now + 2, // target time of next frame, as soon as possible
         .last_frame_time = now + 1,
         .before_last_time = now,
     };
+
+    root.pictura_app.gpa = root.pictura_app.arena.allocator();
 }
 
 pub fn init2(
