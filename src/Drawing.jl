@@ -1,5 +1,7 @@
 module Drawing
 
+export draw, transform
+
 import ..Pictura
 using PicturaShapes
 
@@ -18,6 +20,7 @@ translate_matrix(dx, dy) = TFMatrix(1, 0, dx, 0, 1, dy)
 has_only_moved(m::TFMatrix) = (m.xrow[1], m.xrow[2], m.yrow[1], m.yrow[2]) == (1.0, 0.0, 0.0, 1.0)
 has_rotated(m::TFMatrix) = !(m.xrow[2] == 0 == m.yrow[1])
 has_translated(m::TFMatrix) = !(m.xrow[3] == 0 == m.yrow[3])
+has_shear(m::TFMatrix) = !(m.xrow[1] * m.xrow[2] + m.yrow[1] * m.yrow[2] + 1 ≈ 1)
 
 Base.:*(a::TFMatrix, b::TFMatrix) = TFMatrix(
     a.xrow[1]*b.xrow[1] + a.xrow[2]*b.yrow[1], 
@@ -123,8 +126,15 @@ let stack::Vector{TFMatrix} = TFMatrix[],
 
 end
 
+function transform(p::Point)
+    tf, _ = get_matrix()
+    Point(
+        p.x * tf.xrow[1] + p.y * tf.xrow[2] + tf.xrow[3],
+        p.x * tf.yrow[1] + p.y * tf.yrow[2] + tf.yrow[3]
+    )
+end
 
-
+draw_no_transform(img::Pictura.Image, ::Nothing) = nothing
 draw_no_transform(img::Pictura.Image, p::Point) = Pictura.draw_point(
     img, p, Pictura.strokecolor(), 0.5*Pictura.strokewidth()
 )
@@ -153,6 +163,14 @@ draw_no_transform(img::Pictura.Image, e::Ellipse) = Pictura.draw_ellipse(
     Pictura.fillcolor(),
     Pictura.strokecolor(), 0.5*Pictura.strokewidth()
 )
+function draw_no_transform(img::Pictura.Image, q::Quatrilateral, corner_radius=0)
+    # TODO write shader and stuff for quatrilateral
+    for s in sides(q)
+        draw_no_transform(img, s)
+    end
+end
+
+
 
 function draw(img::Pictura.Image, p::Point)
     tf, has_transformed = get_matrix()
@@ -160,26 +178,7 @@ function draw(img::Pictura.Image, p::Point)
         return draw_no_transform(img, p)
     end
 
-    if has_only_moved(tf)
-        dx, dy = tf.xrow[3], tf.yrow[3]
-        return draw_no_transform(img, p + Point(dx, dy))
-    end
-
-    if !has_rotated(tf)
-        sx, sy = tf.xrow[1], tf.yrow[2]
-        dx, dy = tf.xrow[3], tf.yrow[3]
-        p2 = scale(p, sx, sy) + Point(dx, dy)
-
-        return draw_no_transform(img, p2)
-    end
-
-    θ, sx, sy, ϕ, dx, dy = get_params()
-
-    p2 = rotate(p, θ)
-    p3 = scale(p2, sx, sy)
-    p4 = rotate(p3, ϕ)
-    p5 = translate(p4, dx, dy)
-    return draw_no_transform(img, p5)
+    return draw_no_transform(img, transform(p))
 end
 
 
@@ -189,43 +188,20 @@ function draw(img::Pictura.Image, s::Segment)
         return draw_no_transform(img, s)
     end
 
-    if has_only_moved(tf)
-        dx, dy = tf.xrow[3], tf.yrow[3]
-        return draw_no_transform(img, s + Point(dx, dy))
-    end
-
-    if !has_rotated(tf)
-        sx, sy = tf.xrow[1], tf.yrow[2]
-        dx, dy = tf.xrow[3], tf.yrow[3]
-        p2 = scale(s, sx, sy) + Point(dx, dy)
-
-        return draw_no_transform(img, p2)
-    end
-
-    θ, sx, sy, ϕ, dx, dy = get_params()
-
-    s2 = rotate(s, θ)
-    s3 = scale(s2, sx, sy)
-    s4 = rotate(s3, ϕ)
-    s5 = translate(s4, dx, dy)
-    return draw_no_transform(img, s5)
+    return draw_no_transform(img, Segment(transform(s.p1), transform(s.p2)))
 end
 
 function draw(img::Pictura.Image, l::Line)
     tf, has_transformed = get_matrix()
-    if !has_transformed
-        s = l ∩ AxisRect(-100, -100, Pictura.width()+200, Pictura.height()+200)
+    s = l ∩ AxisRect(-100, -100, Pictura.width()+200, Pictura.height()+200)
+    
+    if !has_transformed    
         return draw_no_transform(img, s)
     end
 
-    θ, sx, sy, ϕ, dx, dy = get_params()
-
-    l2 = rotate(l, θ)
-    l3 = scale(l2, sx, sy)
-    l4 = rotate(l3, ϕ)
-    l5 = translate(l4, dx, dy)
-    s = l5 ∩ AxisRect(-100, -100, Pictura.width()+200, Pictura.height()+200)
-    return draw_no_transform(img, s)
+    s2 = Segment(transform(s.p1), transform(s.p2))
+    s3 = Line(s2) ∩ AxisRect(-100, -100, Pictura.width()+200, Pictura.height()+200)
+    return draw_no_transform(img, s3)
 
 end
 
@@ -235,66 +211,42 @@ function draw(img::Pictura.Image, a::AxisRect, corner_radius)
         return draw_no_transform(img, a, corner_radius)
     end
 
-    if has_only_moved(tf)
-        dx, dy = tf.xrow[3], tf.yrow[3]
-        return draw_no_transform(img, a + Point(dx, dy), corner_radius)
-    end
+    c = corners(a)
+    tl, tr, bl, br = transform(c.tl), transform(c.tr), transform(c.bl), transform(c.br)
 
     if !has_rotated(tf)
-        sx, sy = tf.xrow[1], tf.yrow[2]
-        dx, dy = tf.xrow[3], tf.yrow[3]
-        a2 = scale(a, sx, sy) + Point(dx, dy)
-
-        return draw_no_transform(img, a2, 0.5*(abs(sx) + abs(sy)) * corner_radius)
+        return draw_no_transform(img, AxisRect(tl, tr.x - tl.x, bl.y - tl.y, mode=:corner), corner_radius)
     end
 
-    θ, sx, sy, ϕ, dx, dy = get_params()
-
-    if abs(sx) ≈ abs(sy)
-        r = rotate(a, θ)
-        r2 = sx * r
-        r3 = rotate(r2, ϕ)
-        r4 = translate(r3, dx, dy)
-        return draw_no_transform(img, r4, sx * corner_radius)
+    if !has_shear(tf)
+        return draw_no_transform(img, Rect(tl=tl, tr=tr, bl=bl, br=br), corner_radius)
     end
 
-    r = rotate(a, θ)
-    q = scale(r, sx, sy)
-    q2 = rotate(q, ϕ)
-    q3 = translate(q2, dx, dy)
-    return draw_no_transform(img, q3, 0.5*(abs(sx) + abs(sy)) * corner_radius)
-
+    return draw_no_transform(img, Quatrilateral(tl,tr,br,bl), corner_radius)
 end
 
 
-function draw(img::Pictura.Image, a::Rect, corner_radius)
+function draw(img::Pictura.Image, r::Rect, corner_radius)
     tf, has_transformed = get_matrix()
     if !has_transformed
-        return draw_no_transform(img, a, corner_radius)
+        return draw_no_transform(img, r, corner_radius)
     end
 
     if has_only_moved(tf)
         dx, dy = tf.xrow[3], tf.yrow[3]
-        return draw_no_transform(img, a + Point(dx, dy))
+        return draw_no_transform(img, r + Point(dx, dy))
     end
+
+    c = corners(r)
+    tl, tr, bl, br = transform(c.tl), transform(c.tr), transform(c.bl), transform(c.br)
 
     θ, sx, sy, ϕ, dx, dy = get_params()
 
     if abs(sx) ≈ abs(sy)
-        r = rotate(a, θ)
-        q = scale(r, sx, sy)
-        r2 = simplify(q)
-        @assert typeof(r2) == Rect
-        r3 = rotate(r2, ϕ)
-        r4 = translate(r3, dx, dy)
-        return draw_no_transform(img, r4, sx * corner_radius)
+        return draw_no_transform(img, Rect(tl=tl, tr=tr, bl=bl, br=br), corner_radius)
     end
 
-    r = rotate(a, θ)
-    q = scale(r, sx, sy)
-    q2 = rotate(q, ϕ)
-    q3 = translate(q2, dx, dy)
-    return draw_no_transform(img, q3, 0.5*(abs(sx) + abs(sy)) * corner_radius)
+    return draw_no_transform(img, Quatrilateral(tl,tr,br,bl), corner_radius)
 
 end
 
@@ -312,12 +264,7 @@ function draw(img::Pictura.Image, c::Circle)
     θ, sx, sy, ϕ, dx, dy = get_params()
 
     if abs(sx) ≈ abs(sy)
-        c2 = rotate(c, θ)
-        e = scale(c2, sx, sy)
-        c3 = Circle(e.center, e.radius.x)
-        c4 = rotate(c3, ϕ)
-        c5 = translate(c4, dx, dy)
-        return draw_no_transform(img, c5)
+        return draw_no_transform(img, Circle(transform(c.center), abs(sx)*c.radius))
     end
 
     c2 = rotate(c, θ)
