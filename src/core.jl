@@ -117,7 +117,7 @@ function draw_rect(img::Image, r::Rect, corner_radius, fill::Color, stroke::Colo
     sc = floats(stroke, Float32)
     crs = bounding_box(r, stroke_radius+1) |> Rect{Float32} |> corners
     PicturaLib.draw_rect(
-        img.ptr, fr.w, fr.h, Float32(corner_radius),
+        img.ptr, fr.w, fr.h, Float32(abs(corner_radius)),
         fc.r, fc.g, fc.b, fc.a,
         sc.r, sc.g, sc.b, sc.a, Float32(stroke_radius),
         crs.tl.x, crs.tl.y, crs.tr.x, crs.tr.y, crs.bl.x, crs.bl.y, crs.br.x, crs.br.y
