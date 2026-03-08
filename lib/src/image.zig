@@ -679,8 +679,8 @@ pub fn draw_rect(
     std.debug.assert(rect_corner_radius >= 0);
 
     const frag_pcs = fill_color ++ stroke_color ++ [_]f32{
-        @max(0, 0.5 * rect_height - rect_corner_radius),
-        @max(0, 0.5 * rect_width - rect_corner_radius),
+        0.5 * rect_height - rect_corner_radius,
+        0.5 * rect_width - rect_corner_radius,
         rect_corner_radius,
         stroke_radius,
     };
