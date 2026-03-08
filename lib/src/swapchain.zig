@@ -112,7 +112,7 @@ pub const Swapchain = struct {
             vulkan.VK_SUBOPTIMAL_KHR => {
                 swapchain.request_recreation = true;
             },
-            vulkan.VK_TIMEOUT => {
+            vulkan.VK_TIMEOUT, vulkan.VK_NOT_READY => {
                 // there is a sempaphore that's ready, but the swapchain does not have an image ready
                 swapchain.semaphores.cancel(); // reset the image acquired semaphore to ready
                 return;
