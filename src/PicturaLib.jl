@@ -120,7 +120,7 @@ function create_image(w, h)
 	)::Ptr{Cvoid}
 end
 
-function create_image_from_pixels(w, h, srcpixels)
+function create_image_from_pixels2(w, h, srcpixels)
     @ccall lib.create_image_from_pixels(
 		w::UInt32,
 		h::UInt32,

@@ -255,7 +255,7 @@ function main()
     write_c_header(c_header, constants, functions)
     close(c_header)
 
-    jl_module = open("../src/picturalib.jl", "w")
+    jl_module = open("../src/PicturaLib.jl", "w")
     write_jl_module(jl_module, constants, functions)
     close(jl_module)
     
