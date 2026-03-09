@@ -1,13 +1,13 @@
 module Pictura
 
-export setup, color, @drawloop
+export setup, color, @drawloop, @pictura
 export mouse, noloop, framerate, framecount
 export loadpixels, updatepixels, pixels, width, height
 
 export @mousepressed , @mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
 export CENTER, MIDDLE, WHEEL, MOUSEWHEEL, ENTER, BACK, BACKSPACE, TAB, SPACE, SPACEBAR, COMMA, PERIOD
 
-include("Picturalib.jl")
+include("PicturaLib.jl")
 using .PicturaLib
 
 export DELETE, RIGHT, LEFT, DOWN, UP, SHIFT, CTRL, ALT, HOME, END, PAGEUP, PAGEDOWN, INSERT
@@ -18,11 +18,11 @@ Base.map(x::Real, a::Real, b::Real, A::Real, B::Real) = fma(x, B-A, fma(A, b, -B
 using PicturaShapes
 
 
-struct Color
-    color::UInt32
-end
 
-include("color.jl")
+
+include("PicturaColors.jl")
+using .PicturaColors
+export color, red, green, blue
 
 
 
@@ -31,7 +31,7 @@ mutable struct Image
     h::UInt32
     ptr::Ptr{Cvoid}
     pixel_ptr::Union{Ptr{UInt32}, Nothing}
-    pixel_array::Union{Matrix{Color}, Nothing}
+    pixel_array::Union{Matrix{PicturaColor}, Nothing}
 end
 
 Image(w, h, ptr::Ptr{Cvoid}) = Image(w, h, ptr, nothing, nothing)
@@ -44,9 +44,9 @@ include("image.jl")
 mutable struct App
     canvas_id::Int
     canvas::Image
-    stroke::Color
+    stroke::PicturaColor
     strokewidth::Float64
-    fill::Color
+    fill::PicturaColor
     framecount::UInt
     is_initialized::Bool
     is_looping::Bool
@@ -77,13 +77,13 @@ using .Callbacks
 
 include("core.jl")
 
-export strokecolor, fillcolor, strokewidth
+export strokecolor, fillcolor, strokewidth, nostroke, nofill
 
 has_stroke() = alpha(app.stroke) > 0
 has_fill()   = alpha(app.fill) > 0
 
 strokecolor() = app.stroke
-strokecolor(c::Color) = app.stroke = c
+strokecolor(c::PicturaColor) = app.stroke = c
 strokecolor(x) = strokecolor(color(x))
 strokecolor(r, g, b) = strokecolor(color(r, g, b))
 strokecolor(r, g, b, a) = strokecolor(color(r, g, b, a))
@@ -92,10 +92,13 @@ strokewidth(w) = app.strokewidth=abs(w)
 strokewidth() = app.strokewidth
 
 fillcolor() = app.fill
-fillcolor(c::Color) = app.fill = c
+fillcolor(c::PicturaColor) = app.fill = c
 fillcolor(x) = fillcolor(color(x))
 fillcolor(r, g, b) = fillcolor(color(r, g, b))
 fillcolor(r, g, b, a) = fillcolor(color(r, g, b, a))
+
+nostroke() = strokecolor(0,0,0,0)
+nofill() = fillcolor(0,0,0,0)
 
 width() = width(app.canvas)
 height() = height(app.canvas)
@@ -111,8 +114,9 @@ mouse() = app.mouse
 framerate() = length(app.frametimes) / sum(app.frametimes)
 framecount() = app.framecount
 
+
 export background
-function background(img::Image, c::Color)
+function background(img::Image, c::PicturaColor)
     f = floats(c, Float32)
     PicturaLib.draw_background(img.ptr, f.r, f.g, f.b, 1.0)
 end
@@ -124,7 +128,7 @@ background(r, g, b) = backgroudn(app.canvas, r, g, b)
 
 
 include("Drawing.jl")
-
+export draw, transform
 export translate, scale, rotate
 PicturaShapes.translate(dx, dy) = Drawing.tf_translate(dx, dy)
 PicturaShapes.scale(s) = Drawing.tf_scale(s, s)
@@ -158,6 +162,31 @@ circle(x, y, r) = circle(app.canvas, x, y, r)
 
 ellipse(img::Image, x, y, rx, ry, angle=0) = Drawing.draw(img, Ellipse(x, y, rx, ry, angle))
 ellipse(x, y, rx, ry, angle=0) = ellipse(app.canvas, x, y, rx, ry, angle)
+
+
+
+import FileIO
+
+export load_image, save_image, save_frame
+
+function load_image(path)
+    @assert app.is_initialized
+    
+    img::Matrix{PicturaColor} = FileIO.load(path)
+    return create_image(img)
+end
+
+function save_image(img::Image, path)
+    @assert app.is_initialized
+    
+    out::Matrix{PicturaColors.Colors.RGBA{Float32}} = pixels(img)[:, :]
+    FileIO.save(path, out)
+end
+
+function save_frame(path)
+    @assert app.is_initialized
+    save_image(app.canvas, path)
+end
 
 
 
@@ -199,6 +228,21 @@ end
 
 Base.size(w::Integer, h::Integer) = (UInt32(w), UInt32(h))
 
+
+macro pictura(expr)
+    return quote
+        let
+            try 
+                $(esc(expr))
+            catch e
+                if $(@__MODULE__).app.is_initialized
+                    quit()
+                end
+                rethrow(e)
+            end
+        end
+    end
+end
 
 
 function setup(size::Tuple{UInt32, UInt32}; borderless = false, fullscreen = false)

@@ -38,7 +38,7 @@ function get_canvas_ptr()
     return PicturaLib.get_canvas() # always returns the same address
 end
 
-function draw_background(img::Image, c::Color)
+function draw_background(img::Image, c::PicturaColor)
     f = floats(c, Float32)
     PicturaLib.draw_background(img.ptr, f.r, f.g, f.b, f.a)
 end
@@ -55,17 +55,20 @@ function create_image(w, h)
     error("Pictura is not initialized")
 end
 
-function create_image(pixels::Matrix{Color})
+function create_image(pixels::Matrix{PicturaColor})
     if app.is_initialized
         h, w = size(pixels)
         pixels_tr = transpose(pixels)[:, :]
-        img_ptr = PicturaLib.create_image_from_pixels(w, h, pointer(pixels_tr, 1))
+
+        img_ptr = PicturaLib.create_image_from_pixels2(w, h, pointer(pixels_tr, 1))
         if img_ptr == C_NULL
             error("failed to create image")
         end
         img = Image(UInt32(w), UInt32(h), img_ptr)
         push!(app.images, img)
         return img
+
+        # return pointer(pixels_tr, 1)
     end
 end
 
@@ -79,13 +82,13 @@ end
 
 update_pixels(img::Image) = PicturaLib.update_pixels(img.ptr)
 
-function draw_point(img::Image, p::Point, c::Color, stroke_radius)
+function draw_point(img::Image, p::Point, c::PicturaColor, stroke_radius)
     f = floats(c, Float32)
     fp = Point{Float32}(p)
     PicturaLib.draw_point(img.ptr, fp.x, fp.y, f.r, f.g, f.b, f.a, Float32(stroke_radius))
 end
 
-function draw_segment(img::Image, s::Segment, c::Color, stroke_radius)
+function draw_segment(img::Image, s::Segment, c::PicturaColor, stroke_radius)
     f = floats(c, Float32)
     fs = Segment{Float32}(s)
     b = Rect{Float32}(bounding_box(fs, stroke_radius+1))
@@ -97,7 +100,7 @@ function draw_segment(img::Image, s::Segment, c::Color, stroke_radius)
     )
 end
 
-function draw_ellipse(img::Image, e::Ellipse, fill::Color, stroke::Color, stroke_radius)
+function draw_ellipse(img::Image, e::Ellipse, fill::PicturaColor, stroke::PicturaColor, stroke_radius)
     ef = Ellipse{Float32}(e)
     fc = floats(fill, Float32)
     sc = floats(stroke, Float32)
@@ -111,7 +114,7 @@ function draw_ellipse(img::Image, e::Ellipse, fill::Color, stroke::Color, stroke
     )
 end
 
-function draw_rect(img::Image, r::Rect, corner_radius, fill::Color, stroke::Color, stroke_radius)
+function draw_rect(img::Image, r::Rect, corner_radius, fill::PicturaColor, stroke::PicturaColor, stroke_radius)
     fr = Rect{Float32}(r)
     fc = floats(fill, Float32)
     sc = floats(stroke, Float32)
