@@ -2,3 +2,4 @@
 stderr
 .spirv
 zig-out
+/Manifest.toml
