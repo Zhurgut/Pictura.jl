@@ -77,6 +77,8 @@ using .Callbacks
 
 include("core.jl")
 
+include("functions.jl")
+
 export strokecolor, fillcolor, strokewidth, nostroke, nofill
 
 has_stroke() = alpha(app.stroke) > 0
@@ -191,9 +193,7 @@ end
 
 
 
-function before_rendering(clear_transform)
-    PicturaLib.wait_until_next_frame()
-    PicturaLib.handle_events()
+function prepare_canvas(clear_transform)
 
     app.canvas.w, app.canvas.h = get_window_size()
     id = PicturaLib.get_canvas_id()
@@ -214,9 +214,14 @@ function before_rendering(clear_transform)
     end
 end
 
+function before_rendering(clear_transform)
+    prepare_canvas(clear_transform)    
+end
+
 function after_rendering()
+    PicturaLib.handle_events()
     PicturaLib.present()
-    
+    PicturaLib.wait_until_next_frame()
 end
 
 
