@@ -120,7 +120,7 @@ function create_image(w, h)
 	)::Ptr{Cvoid}
 end
 
-function create_image_from_pixels2(w, h, srcpixels)
+function create_image_from_pixels(w, h, srcpixels)
     @ccall lib.create_image_from_pixels(
 		w::UInt32,
 		h::UInt32,
@@ -292,6 +292,108 @@ function draw_image(dst, src, use_nearest_sampling, dst_tl_x, dst_tl_y, dst_tr_x
 		src_bl_y::Float32,
 		src_br_x::Float32,
 		src_br_y::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function mix_channels(dst, src, w00, w01, w02, w03, w10, w11, w12, w13, w20, w21, w22, w23, w30, w31, w32, w33, of0, of1, of2, of3)
+    err = @ccall lib.mix_channels(
+		dst::Ptr{Cvoid},
+		src::Ptr{Cvoid},
+		w00::Float32,
+		w01::Float32,
+		w02::Float32,
+		w03::Float32,
+		w10::Float32,
+		w11::Float32,
+		w12::Float32,
+		w13::Float32,
+		w20::Float32,
+		w21::Float32,
+		w22::Float32,
+		w23::Float32,
+		w30::Float32,
+		w31::Float32,
+		w32::Float32,
+		w33::Float32,
+		of0::Float32,
+		of1::Float32,
+		of2::Float32,
+		of3::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function mix_channels2(dst, src, w00, w01, w02, w03, w04, w05, w06, of0, w10, w11, w12, w13, w14, w15, w16, of1, w20, w21, w22, w23, w24, w25, w26, of2, w30, w31, w32, w33, w34, w35, of3, seed)
+    err = @ccall lib.mix_channels2(
+		dst::Ptr{Cvoid},
+		src::Ptr{Cvoid},
+		w00::Float32,
+		w01::Float32,
+		w02::Float32,
+		w03::Float32,
+		w04::Float32,
+		w05::Float32,
+		w06::Float32,
+		of0::Float32,
+		w10::Float32,
+		w11::Float32,
+		w12::Float32,
+		w13::Float32,
+		w14::Float32,
+		w15::Float32,
+		w16::Float32,
+		of1::Float32,
+		w20::Float32,
+		w21::Float32,
+		w22::Float32,
+		w23::Float32,
+		w24::Float32,
+		w25::Float32,
+		w26::Float32,
+		of2::Float32,
+		w30::Float32,
+		w31::Float32,
+		w32::Float32,
+		w33::Float32,
+		w34::Float32,
+		w35::Float32,
+		of3::Float32,
+		seed::Float32
+	)::UInt32
+    if err != 0
+        s = unsafe_string(error_string(err))
+        error(s)
+    end
+    nothing
+end
+
+function filter(dst, src, w00, w01, w02, w10, w11, w12, w20, w21, w22, mx, mn, avg, std_dev, off)
+    err = @ccall lib.filter(
+		dst::Ptr{Cvoid},
+		src::Ptr{Cvoid},
+		w00::Float32,
+		w01::Float32,
+		w02::Float32,
+		w10::Float32,
+		w11::Float32,
+		w12::Float32,
+		w20::Float32,
+		w21::Float32,
+		w22::Float32,
+		mx::Float32,
+		mn::Float32,
+		avg::Float32,
+		std_dev::Float32,
+		off::Float32
 	)::UInt32
     if err != 0
         s = unsafe_string(error_string(err))

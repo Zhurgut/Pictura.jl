@@ -253,7 +253,7 @@ end
 function draw(img::Pictura.Image, c::Circle)
     tf, has_transformed = get_matrix()
     if !has_transformed
-        return draw_now_transform(img, c)
+        return draw_no_transform(img, c)
     end
 
     if has_only_moved(tf)
