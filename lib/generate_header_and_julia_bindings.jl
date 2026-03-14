@@ -173,7 +173,7 @@ using Libdl
 const EXT = Libdl.dlext
 
 dev_path = joinpath(@__DIR__, "..", "lib", "zig-out", "lib", "libpictura.\$EXT")
-artf_path = "" # joinpath(artifact"picturalib", "lib", "libpictura.\$EXT")
+artf_path = joinpath(artifact"picturalib", "lib", "libpictura.\$EXT")
 const lib = if isfile(dev_path) dev_path else artf_path end
 
 """)
