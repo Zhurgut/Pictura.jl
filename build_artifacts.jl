@@ -4,7 +4,11 @@ using Base.BinaryPlatforms
 using CodecZlib
 
 # to build the tarballs:
-# tar -czvf picturalib-x86_64-windows.tar.gz --mode='755' -C lib/zig-out .
+# cd lib
+# zig build install -Dtarget=x86_64-windows -Doptimize=ReleaseFast
+# cd ..
+# tar -czvf picturalib-x86_64-windows.tar.gz -C lib/zig-out .
+
 # tar -czvf picturalib-x86_64-linux.tar.gz -C lib/zig-out .
 
 # Configuration

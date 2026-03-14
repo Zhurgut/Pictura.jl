@@ -9,9 +9,9 @@ os = "linux"
     url = "https://github.com/Zhurgut/Pictura.jl/releases/download/v0.1.0/picturalib-x86_64-linux.tar.gz"
 [[picturalib]]
 arch = "x86_64"
-git-tree-sha1 = "babf132a777db203697cf58d752fd4759dfab816"
+git-tree-sha1 = "61c0414e54148f312da8ee99e6c257d33c3d7daf"
 os = "windows"
 
     [[picturalib.download]]
-    sha256 = "7d03d2a11de02869d7404c3a3f5160ba901336b1c66e7f86b89701cac4ed442b"
+    sha256 = "c5d353c15883f0ca636f0f3b1219277c99d5864744efae5e65008d42164cf401"
     url = "https://github.com/Zhurgut/Pictura.jl/releases/download/v0.1.0/picturalib-x86_64-windows.tar.gz"
