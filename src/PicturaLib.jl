@@ -3,11 +3,14 @@
 module PicturaLib
 
 using Artifacts
-using Libdl
-const EXT = Libdl.dlext
 
-dev_path = joinpath(@__DIR__, "..", "lib", "zig-out", "lib", "libpictura.$EXT")
-artf_path = joinpath(artifact"picturalib", "lib", "libpictura.$EXT")
+if Sys.iswindows()
+	dev_path = joinpath(@__DIR__, "..", "lib", "zig-out", "bin", "pictura.dll")
+	artf_path = joinpath(artifact"picturalib", "bin", "pictura.dll")
+else
+	dev_path = joinpath(@__DIR__, "..", "lib", "zig-out", "lib", "libpictura.so")
+	artf_path = joinpath(artifact"picturalib", "lib", "libpictura.so")
+end
 const lib = if isfile(dev_path) dev_path else artf_path end
 
 const DELETE = 127
