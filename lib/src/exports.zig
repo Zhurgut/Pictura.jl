@@ -323,6 +323,134 @@ pub export fn draw_image(
     return 0;
 }
 
+pub export fn mix_channels(
+    dst: Image,
+    src: Image,
+    w00: f32,
+    w01: f32,
+    w02: f32,
+    w03: f32,
+    w10: f32,
+    w11: f32,
+    w12: f32,
+    w13: f32,
+    w20: f32,
+    w21: f32,
+    w22: f32,
+    w23: f32,
+    w30: f32,
+    w31: f32,
+    w32: f32,
+    w33: f32,
+    of0: f32,
+    of1: f32,
+    of2: f32,
+    of3: f32,
+) ErrorCode {
+    root.image.mix_channels(
+        @ptrCast(@alignCast(dst)),
+        @ptrCast(@alignCast(src)),
+        [4]f32{ w00, w10, w20, w30 },
+        [4]f32{ w01, w11, w21, w31 },
+        [4]f32{ w02, w12, w22, w32 },
+        [4]f32{ w03, w13, w23, w33 },
+        [4]f32{ of0, of1, of2, of3 },
+        &root.pictura_app,
+    ) catch |e| {
+        return @intFromError(e);
+    };
+    return 0;
+}
+
+pub export fn mix_channels2(
+    dst: Image,
+    src: Image,
+    w00: f32,
+    w01: f32,
+    w02: f32,
+    w03: f32,
+    w04: f32,
+    w05: f32,
+    w06: f32,
+    of0: f32,
+    w10: f32,
+    w11: f32,
+    w12: f32,
+    w13: f32,
+    w14: f32,
+    w15: f32,
+    w16: f32,
+    of1: f32,
+    w20: f32,
+    w21: f32,
+    w22: f32,
+    w23: f32,
+    w24: f32,
+    w25: f32,
+    w26: f32,
+    of2: f32,
+    w30: f32,
+    w31: f32,
+    w32: f32,
+    w33: f32,
+    w34: f32,
+    w35: f32,
+    of3: f32,
+    seed: f32,
+) ErrorCode {
+    root.image.mix_channels2(
+        @ptrCast(@alignCast(dst)),
+        @ptrCast(@alignCast(src)),
+        [4]f32{ w00, w10, w20, w30 },
+        [4]f32{ w01, w11, w21, w31 },
+        [4]f32{ w02, w12, w22, w32 },
+        [4]f32{ w03, w13, w23, w33 },
+        [4]f32{ w04, w14, w24, w34 },
+        [4]f32{ w05, w15, w25, w35 },
+        [3]f32{ w06, w16, w26 },
+        seed,
+        [4]f32{ of0, of1, of2, of3 },
+        &root.pictura_app,
+    ) catch |e| {
+        return @intFromError(e);
+    };
+    return 0;
+}
+
+pub export fn filter(
+    dst: Image,
+    src: Image,
+    w00: f32,
+    w01: f32,
+    w02: f32,
+    w10: f32,
+    w11: f32,
+    w12: f32,
+    w20: f32,
+    w21: f32,
+    w22: f32,
+    mx: f32,
+    mn: f32,
+    avg: f32,
+    std_dev: f32,
+    off: f32,
+) ErrorCode {
+    root.image.filter(
+        @ptrCast(@alignCast(dst)),
+        @ptrCast(@alignCast(src)),
+        [9]f32{ w00, w01, w02, w10, w11, w12, w20, w21, w22 },
+        mx,
+        mn,
+        avg,
+        std_dev,
+        off,
+        &root.pictura_app,
+    ) catch |e| {
+        return @intFromError(e);
+    };
+    return 0;
+}
+
 pub export fn get_mouse_x() f32 {
     return root.pictura_app.event_handler.mouse.x;
 }
