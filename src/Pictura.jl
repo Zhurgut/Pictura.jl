@@ -120,7 +120,7 @@ framecount() = app.framecount
 export background
 function background(img::Image, c::PicturaColor)
     f = floats(c, Float32)
-    PicturaLib.draw_background(img.ptr, f.r, f.g, f.b, 1.0)
+    PicturaLib.draw_background(img.ptr, f.r, f.g, f.b, f.a)
 end
 background(img::Image, x) = background(img, color(x))
 background(img::Image, r, g, b) = background(img, color(r, g, b))
@@ -139,31 +139,61 @@ PicturaShapes.rotate(a) = Drawing.tf_rotate(a)
 
 
 
-export point, segment, line, rect, circle, ellipse
+export point, segment, line, rect, circle, ellipse, image
 
-point(img, x, y) = Drawing.draw(img, Point(x, y))
+point(img::Image, x, y) = Drawing.draw(img, Point(x, y))
+point(img::Image, p) = point(img, p.x, p.y)
 point(x, y) = point(app.canvas, x, y)
+point(p) = point(p.x, p.y)
 
-segment(img, x1, y1, x2, y2) = Drawing.draw(img, Segment(x1, y1, x2, y2))
+segment(img::Image, x1, y1, x2, y2) = Drawing.draw(img, Segment(x1, y1, x2, y2))
+segment(img::Image, a, b, c) = Drawing.draw(img, Segment(a, b, c))
+segment(img::Image, p1, p2) = Drawing.draw(img, Segment(p1, p2))
 segment(x1, y1, x2, y2) = segment(app.canvas, x1, y1, x2, y2)
+segment(a, b, c) = segment(app.canvas, a, b, c)
+segment(p1, p2) = segment(app.canvas, p1, p2)
 
-line(img, x1, y1, x2, y2; infinite=false) = infinite ? Drawing.draw(img, Line(x1, y1, x2, y2)) : segment(img, x1, y1, x2, y2)
+line(img::Image, x1, y1, x2, y2; infinite=false) = infinite ? Drawing.draw(img, Line(x1, y1, x2, y2)) : segment(img, x1, y1, x2, y2)
+line(img::Image, a, b, c; infinite=false) = infinite ? Drawing.draw(img, Line(a, b, c)) : segment(img, a, b, c)
+line(img::Image, p1, p2; infinite=false) = infinite ? Drawing.draw(img, Line(p1, p2)) : segment(img, p1, p2)
 line(x1, y1, x2, y2; infinite=false) = line(app.canvas, x1, y1, x2, y2, infinite=infinite)
+line(a, b, c; infinite=false) = line(app.canvas, a, b, c, infinite=infinite)
+line(p1, p2; infinite=false) = line(app.canvas, p1, p2, infinite=infinite)
 
-function rect(img::Image, x, y, w, h, corner_radius=0; angle=0, mode=:corner)
+function rect(img::Image, x, y, w, h; corner_radius=0, angle=0, mode=:corner)
     if angle == 0
         Drawing.draw(img, AxisRect(x, y, w, h, mode=mode), corner_radius)
     else
         Drawing.draw(img, Rect(x, y, w, h, angle, mode=mode), corner_radius)
     end
 end
-rect(x, y, w, h, corner_radius=0; angle=0, mode=:corner) = rect(app.canvas, x, y, w, h, corner_radius, angle=angle, mode=mode)
+function rect(img::Image, p, w, h; corner_radius=0, angle=0, mode=:corner)
+    rect(img, p.x, p.y, w, h; corner_radius=corner_radius, angle=angle, mode=mode)
+end
+function rect(x, y, w, h; corner_radius=0, angle=0, mode=:corner)
+    rect(app.canvas, x, y, w, h, corner_radius=corner_radius, angle=angle, mode=mode)
+end
+function rect(p, w, h; corner_radius=0, angle=0, mode=:corner)
+    rect(app.canvas, p.x, p.y, w, h, corner_radius=corner_radius, angle=angle, mode=mode)
+end
 
-circle(img, x, y, r) = Drawing.draw(img, Circle(x, y, r))
+
+circle(img::Image, x, y, r) = Drawing.draw(img, Circle(x, y, r))
+circle(img::Image, p, r) = Drawing.draw(img, Circle(p, r))
 circle(x, y, r) = circle(app.canvas, x, y, r)
+circle(p, r) = circle(app.canvas, p, r)
 
-ellipse(img::Image, x, y, rx, ry, angle=0) = Drawing.draw(img, Ellipse(x, y, rx, ry, angle))
-ellipse(x, y, rx, ry, angle=0) = ellipse(app.canvas, x, y, rx, ry, angle)
+ellipse(img::Image, x, y, rx, ry; angle=0) = Drawing.draw(img, Ellipse(x, y, rx, ry, angle))
+ellipse(img::Image, p, rx, ry; angle=0) = Drawing.draw(img, Ellipse(p, rx, ry, angle))
+ellipse(x, y, rx, ry; angle=0) = ellipse(app.canvas, x, y, rx, ry, angle=angle)
+ellipse(p, rx, ry; angle=0) = ellipse(app.canvas, p, rx, ry, angle=angle)
+
+function image(dst::Image, src::Image; src_rect=nothing, dst_rect=nothing, nearest_sampling=false)
+    draw_image(dst, src, nearest_sampling=nearest_sampling, src_rect=src_rect, dst_rect=dst_rect)
+end
+function image(src::Image; src_rect=nothing, dst_rect=nothing, nearest_sampling=false)
+    image(app.canvas, src, src_rect=src_rect, dst_rect=dst_rect, nearest_sampling=nearest_sampling)
+end
 
 
 
@@ -258,7 +288,9 @@ function setup(size::Tuple{UInt32, UInt32}; borderless = false, fullscreen = fal
     app.is_looping = true
     before_rendering(true)
 end
-
+function setup(w, h; borderless=false, fullscreen=false)
+    setup(size(w, h), borderless=borderless, fullscreen=fullscreen)
+end
 
 
 macro drawloop(expr)
