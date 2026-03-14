@@ -3,3 +3,5 @@ stderr
 .spirv
 zig-out
 /Manifest.toml
+picturalib/
+*.tar.gz
