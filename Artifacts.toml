@@ -1,11 +1,11 @@
 [[picturalib]]
 arch = "x86_64"
-git-tree-sha1 = "167274331c2ffd4ca8e06bbd034f4733036b77c4"
+git-tree-sha1 = "1f83b7ecca3ec9b054fac8e3c337c08c7f5cd420"
 libc = "glibc"
 os = "linux"
 
     [[picturalib.download]]
-    sha256 = "cf4a99ad20e3b2b1d17afcbd477667dac8018c4bcd1c0fc5fad840b3c13c7a96"
+    sha256 = "30ac9434a4e48ec6f36bcf3467bc671f3c0fce94ac089a63835f94eec29df64c"
     url = "https://github.com/Zhurgut/Pictura.jl/releases/download/v0.1.0/picturalib-x86_64-linux.tar.gz"
 [[picturalib]]
 arch = "x86_64"

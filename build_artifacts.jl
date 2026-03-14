@@ -9,6 +9,9 @@ using CodecZlib
 # cd ..
 # tar -czvf picturalib-x86_64-windows.tar.gz -C lib/zig-out .
 
+# cd lib
+# zig build install -Dtarget=x86_64-linux -Doptimize=ReleaseFast
+# cd ..
 # tar -czvf picturalib-x86_64-linux.tar.gz -C lib/zig-out .
 
 # Configuration
