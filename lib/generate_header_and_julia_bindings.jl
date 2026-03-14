@@ -178,6 +178,7 @@ else
 	artf_path = joinpath(artifact"picturalib", "lib", "libpictura.so")
 end
 const lib = if isfile(dev_path) dev_path else artf_path end
+chmod(lib, 0o755)
 
 """)
 
