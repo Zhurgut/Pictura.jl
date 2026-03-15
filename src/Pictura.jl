@@ -124,8 +124,9 @@ function background(img::Image, c::PicturaColor)
 end
 background(img::Image, x) = background(img, color(x))
 background(img::Image, r, g, b) = background(img, color(r, g, b))
+background(img::Image, r, g, b, a) = background(img, color(r, g, b, a))
 background(x) = background(app.canvas, x)
-background(r, g, b) = backgroudn(app.canvas, r, g, b)
+background(r, g, b, a) = background(app.canvas, r, g, b, a)
 
 
 
