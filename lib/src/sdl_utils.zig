@@ -15,6 +15,11 @@ pub fn get_display_refresh_rate(window: *sdl.SDL_Window) !f32 {
         std.debug.print("{s}\n", .{sdl.SDL_GetError()});
         return error.get_displaymode_failed;
     }
+    if (display_mode.?.refresh_rate_numerator == 0) {
+        std.debug.print("refresh rate read as 'unspecified', ={d}/{d}\n", .{ display_mode.?.refresh_rate_numerator, display_mode.?.refresh_rate_denominator });
+        return 59.8; // fall back to 60 fps as default
+    }
+
     return display_mode.?.refresh_rate;
 }
 

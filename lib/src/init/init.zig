@@ -179,7 +179,7 @@ pub fn init_app(
     errdefer vulkan.vkDestroyCommandPool.?(device, command_pool, null);
 
     var surface: vulkan.VkSurfaceKHR = undefined;
-    const success = sdl.SDL_Vulkan_CreateSurface(window, @ptrCast(instance), null, &surface);
+    const success = sdl.SDL_Vulkan_CreateSurface(window, @ptrCast(instance), null, @ptrCast(&surface));
     if (!success) {
         print_sdl_error();
         return error.SDL_VulkanCreateSurfaceError;
@@ -206,7 +206,7 @@ pub fn init_app(
     root.events.keyboard = kb[0..@intCast(numkeys)];
 
     const now = sdl.SDL_GetTicksNS();
-    const framerate = try root.sdl_utils.get_display_refresh_rate(window) - 1;
+    const framerate: f32 = try root.sdl_utils.get_display_refresh_rate(window);
 
     root.pictura_app = .{
         .window = window,

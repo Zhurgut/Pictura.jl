@@ -1,7 +1,10 @@
 .zig-cache
+zig-pkg
+zig-out
 stderr
 .spirv
-zig-out
+
 /Manifest.toml
 picturalib/
 *.tar.gz
+*.code-workspace

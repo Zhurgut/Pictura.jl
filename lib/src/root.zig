@@ -3,14 +3,8 @@ const testing = std.testing;
 const assert = std.debug.assert;
 const builtin = @import("builtin");
 
-pub const sdl = @cImport({
-    @cInclude("SDL3/SDL.h");
-    @cInclude("SDL3/SDL_vulkan.h");
-});
-
-pub const vulkan = @cImport({
-    @cInclude("src/init/init_vulkan.h");
-});
+pub const sdl = @import("sdl");
+pub const vulkan = @import("vulkan");
 
 pub const init = @import("init/init.zig");
 pub const image = @import("image.zig");

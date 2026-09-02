@@ -5,33 +5,68 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // var alc = std.heap.GeneralPurposeAllocator(.{}).init;
-    // const gpa = alc.allocator();
-
-    // This creates a "module", which represents a collection of source files alongside
-    // some compilation options, such as optimization mode and linked system libraries.
-    // Every executable or library we compile will be based on one or more modules.
     const lib_mod = b.createModule(.{
-        // `root_source_file` is the Zig "entry point" of the module. If a module
-        // only contains e.g. external object files, you can make this `null`.
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     lib_mod.link_libc = true;
-    lib_mod.linkSystemLibrary("SDL3", .{});
 
-    lib_mod.addIncludePath(.{ .cwd_relative = "./" });
+    //      ___ ___  _
+    //     / __|   \| |
+    //     \__ \ |) | |__
+    //     |___/___/|____|
+    //
+    const sdl3 = b.dependency("sdl", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    lib_mod.linkLibrary(sdl3.artifact("SDL3"));
 
-    lib_mod.addCSourceFile(.{ .file = .{ .cwd_relative = "src/init/init_vulkan.c" } });
+    const translate_c_sdl = b.addTranslateC(.{
+        .root_source_file = b.path("src/sdl.h"),
+        .target = target,
+        .optimize = optimize,
+    });
 
-    if (builtin.os.tag == .windows) {
-        lib_mod.addIncludePath(.{ .cwd_relative = "C:/msys64/ucrt64/include" });
-        lib_mod.addIncludePath(.{ .cwd_relative = "C:/VulkanSDK/1.4.328.1/Include" });
+    translate_c_sdl.addIncludePath(sdl3.path("include"));
+    const sdl_module = translate_c_sdl.createModule();
+    lib_mod.addImport("sdl", sdl_module);
 
+    //     __   __    _ _
+    //     \ \ / /  _| | |____ _ _ _
+    //      \ V / || | | / / _` | ' \
+    //       \_/ \_,_|_|_\_\__,_|_||_|
+    //
+    const vulkan_headers = b.dependency("vulkan-headers", .{});
+    const vulkan_utility_libraries = b.dependency("vulkan-utility-libraries", .{});
+    const volk = b.dependency("volk", .{});
+
+    const translate_c_vulkan = b.addTranslateC(.{
+        .root_source_file = b.path("src/init/init_vulkan.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    translate_c_vulkan.addIncludePath(volk.path("."));
+    translate_c_vulkan.addIncludePath(vulkan_headers.path("include"));
+    translate_c_vulkan.addIncludePath(vulkan_utility_libraries.path("include"));
+
+    const vulkan_module = translate_c_vulkan.createModule();
+    vulkan_module.addIncludePath(volk.path("."));
+    vulkan_module.addIncludePath(vulkan_headers.path("include"));
+    vulkan_module.addIncludePath(vulkan_utility_libraries.path("include"));
+    vulkan_module.addCSourceFile(.{ .file = .{ .cwd_relative = "src/init/init_vulkan.c" } });
+
+    lib_mod.addImport("vulkan", vulkan_module);
+
+    //      ___      _ _    _
+    //     | _ )_  _(_) |__| |
+    //     | _ \ || | | / _` |
+    //     |___/\_,_|_|_\__,_|
+    //
+    if (target.result.os.tag == .windows) {
         lib_mod.linkSystemLibrary("user32", .{});
         lib_mod.linkSystemLibrary("gdi32", .{});
         lib_mod.linkSystemLibrary("winmm", .{});
@@ -40,11 +75,6 @@ pub fn build(b: *std.Build) !void {
         lib_mod.linkSystemLibrary("imm32", .{});
         lib_mod.linkSystemLibrary("version", .{});
         lib_mod.linkSystemLibrary("oleaut32", .{});
-    } else if (builtin.os.tag == .linux) {
-        lib_mod.addIncludePath(.{ .cwd_relative = "$VULKAN_SDK/x86_64/include" });
-    } else if (builtin.os.tag == .macos) {
-        lib_mod.linkFramework("Cocoa", .{});
-        lib_mod.linkFramework("CoreAudio", .{});
     }
 
     const lib = b.addLibrary(.{
@@ -57,13 +87,8 @@ pub fn build(b: *std.Build) !void {
 
     lib.step.dependOn(&shaders.step);
 
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
     b.installArtifact(lib);
 
-    // Creates a step for unit testing. This only builds the test executable
-    // but does not run it.
     const lib_unit_tests = b.addTest(.{
         .root_module = lib_mod,
     });
@@ -71,29 +96,30 @@ pub fn build(b: *std.Build) !void {
     lib_unit_tests.step.dependOn(&shaders.step);
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
-
-    // Similar to creating the run step earlier, this exposes a `test` step to
-    // the `zig build --help` menu, providing a way for the user to request
-    // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
 }
 
+//      ___ _            _
+//     / __| |_  __ _ __| |___ _ _ ___
+//     \__ \ ' \/ _` / _` / -_) '_(_-<
+//     |___/_||_\__,_\__,_\___|_| /__/
+//
 fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
-    var alc = std.heap.GeneralPurposeAllocator(.{}).init;
-    const gpa = alc.allocator();
+    const gpa = b.allocator;
+    const io = b.graph.io;
 
     const usf = std.Build.Step.UpdateSourceFiles.create(b);
 
-    const shader_file = try std.fs.cwd().createFile("src/shaders.zig", .{});
-    defer shader_file.close();
+    const shader_file = try b.build_root.handle.createFile(io, "src/shaders.zig", .{});
+    defer shader_file.close(io);
 
     var buffer: [1024]u8 = undefined;
 
-    var writer = shader_file.writer(&buffer);
+    var writer = shader_file.writer(io, &buffer);
     var shaders_zig_out = &writer.interface;
 
-    const dir = try std.fs.cwd().openDir("src/shaders", .{ .iterate = true });
+    const dir = try b.build_root.handle.openDir(io, "src/shaders", .{ .iterate = true });
     var walker = try dir.walk(gpa);
 
     try shaders_zig_out.print(
@@ -104,10 +130,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
         \\
     , .{});
 
-    var entry = try walker.next();
+    var entry = try walker.next(io);
     while (entry) |e| {
         if (e.kind != .file) {
-            entry = try walker.next();
+            entry = try walker.next(io);
             continue;
         }
 
@@ -116,7 +142,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
         const out_filename = try std.fmt.allocPrint(gpa, "{s}.spv", .{shadername});
         const out_file_path = try std.fmt.allocPrint(gpa, "src/.spirv/{s}.spv", .{shadername});
 
-        var compile_shader = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V" });
+        var compile_shader = b.addSystemCommand(&[_][]const u8{ "glslangValidator", "-V", "--target-env", "vulkan1.3" });
         compile_shader.addFileArg(b.path(path));
         compile_shader.addArg("-o");
         const shader_output = compile_shader.addOutputFileArg(out_filename);
@@ -125,7 +151,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
         try shaders_zig_out.print("const {s}_spv align(64) = @embedFile(\".spirv/{s}.spv\").*;\n", .{ shadername, shadername });
 
-        entry = try walker.next();
+        entry = try walker.next(io);
     }
 
     try shaders_zig_out.print(
@@ -136,10 +162,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
     walker = try dir.walk(gpa);
 
-    entry = try walker.next();
+    entry = try walker.next(io);
     while (entry) |e| {
         if (e.kind != .file) {
-            entry = try walker.next();
+            entry = try walker.next(io);
             continue;
         }
 
@@ -150,7 +176,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
             \\
         , .{shadername});
 
-        entry = try walker.next();
+        entry = try walker.next(io);
     }
 
     try shaders_zig_out.print(
@@ -162,10 +188,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
     walker = try dir.walk(gpa);
 
-    entry = try walker.next();
+    entry = try walker.next(io);
     while (entry) |e| {
         if (e.kind != .file) {
-            entry = try walker.next();
+            entry = try walker.next(io);
             continue;
         }
 
@@ -176,7 +202,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
             \\
         , .{ shadername, shadername });
 
-        entry = try walker.next();
+        entry = try walker.next(io);
     }
 
     try shaders_zig_out.print(
@@ -189,10 +215,10 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
 
     walker = try dir.walk(gpa);
 
-    entry = try walker.next();
+    entry = try walker.next(io);
     while (entry) |e| {
         if (e.kind != .file) {
-            entry = try walker.next();
+            entry = try walker.next(io);
             continue;
         }
 
@@ -203,7 +229,7 @@ fn compile_shaders(b: *std.Build) !*std.Build.Step.UpdateSourceFiles {
             \\
         , .{shadername});
 
-        entry = try walker.next();
+        entry = try walker.next(io);
     }
 
     try shaders_zig_out.print(
