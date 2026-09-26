@@ -2,9 +2,11 @@
 module Callbacks
 
 import ..Pictura
+using ..Pictura: Core
 using PicturaShapes
 
-export @mousepressed ,@mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
+export @mousepressed, @mousereleased, @mousemoved, @mousedragged, @mousewheel, @keypressed, @keyreleased
+export CENTER, MIDDLE, WHEEL, MOUSEWHEEL, ENTER, BACK, BACKSPACE, TAB, SPACE, SPACEBAR, COMMA, PERIOD
 
 
 struct MouseButton
@@ -31,7 +33,7 @@ const SPACEBAR = SPACE
 const COMMA = Int(',')
 const PERIOD = Int('.')
 
-export CENTER, MIDDLE, WHEEL, MOUSEWHEEL, ENTER, BACK, BACKSPACE, TAB, SPACE, SPACEBAR, COMMA, PERIOD
+
 
 Base.:(==)(b, m::MouseButton) = m == b
 function Base.:(==)(m::MouseButton, b::Int)
@@ -82,11 +84,12 @@ function Base.:(==)(k::Key, b::Symbol)
     end
     false
 end
-Base.:(==)(k::Key, b::String) = if length(b) == 1
+Base.:(==)(k::Key, b::String) =
+    if length(b) == 1
         return k == Char(b[1])
     else
         return k == Symbol(b)
-end
+    end
 
 
 const on_mouse_pressed::Ref{Function} = Ref{Function}((BUTTON) -> nothing)
@@ -99,8 +102,13 @@ const on_key_released::Ref{Function} = Ref{Function}((k, s, c, a) -> nothing)
 
 function mouse_pressed_fn(x::Float32, y::Float32, button::UInt32)
     m = Pictura.app.mouse
-    l,md,r = m.l || button == 1, m.m || button == 2, m.r || button == 3
-    Pictura.app.mouse = (l=l, m=md, r=r, x=x, y=y, pos=Point(x, y), prev=m.prev)
+    Pictura.app.mouse = Core.MouseState(
+        m.l || button == 1,
+        m.m || button == 2,
+        m.r || button == 3,
+        Point(x, y),
+        m.prev # TODO, check whether m.prev is correct
+    )
     BUTTON = MouseButton(UInt8(button))
     on_mouse_pressed[](BUTTON)
     nothing
@@ -108,8 +116,13 @@ end
 
 function mouse_released_fn(x::Float32, y::Float32, button::UInt32)
     m = Pictura.app.mouse
-    l,md,r = m.l && button != 1, m.m && button != 2, m.r && button != 3
-    Pictura.app.mouse = (l=l, m=md, r=r, x=x, y=y, pos=Point(x, y), prev=m.prev)
+    Pictura.app.mouse = Core.MouseState(
+        m.l && button != 1,
+        m.m && button != 2,
+        m.r && button != 3,
+        Point(x, y),
+        m.prev # TODO, check whether m.prev is correct
+    )
     BUTTON = MouseButton(UInt8(button))
     on_mouse_released[](BUTTON)
     nothing
@@ -122,13 +135,15 @@ function mouse_wheel_fn(vert::Float32, hori::Float32)
 end
 
 function mouse_moved_fn(x_prev::Float32, y_prev::Float32, x::Float32, y::Float32)
-    Pictura.app.mouse = Pictura.get_mouse_state()
+    # TODO determine whether it is necessary here to get mouse state
+    Pictura.app.mouse = Pictura.Core.get_mouse_state()
     on_mouse_moved[]()
     nothing
 end
 
 function mouse_dragged_fn(x_prev::Float32, y_prev::Float32, x::Float32, y::Float32)
-    # Pictura.app.mouse = Pictura.get_mouse_state()
+    # TODO determine whether it is necessary here to get mouse state
+    Pictura.app.mouse = Pictura.Core.get_mouse_state()
     on_mouse_dragged[]()
     nothing
 end
@@ -143,13 +158,13 @@ function key_released_fn(key::UInt8, shift::Int32, ctrl::Int32, alt::Int32)
     nothing
 end
 
-c_mouse_pressed_fn::Ptr{Nothing}  = 0
+c_mouse_pressed_fn::Ptr{Nothing} = 0
 c_mouse_released_fn::Ptr{Nothing} = 0
-c_mouse_wheel_fn::Ptr{Nothing}    = 0
-c_mouse_moved_fn::Ptr{Nothing}    = 0
-c_mouse_dragged_fn::Ptr{Nothing}  = 0
-c_key_pressed_fn::Ptr{Nothing}    = 0
-c_key_released_fn::Ptr{Nothing}   = 0
+c_mouse_wheel_fn::Ptr{Nothing} = 0
+c_mouse_moved_fn::Ptr{Nothing} = 0
+c_mouse_dragged_fn::Ptr{Nothing} = 0
+c_key_pressed_fn::Ptr{Nothing} = 0
+c_key_released_fn::Ptr{Nothing} = 0
 
 
 
@@ -187,7 +202,15 @@ function __init__()
     c_key_released_fn = @cfunction(key_released_fn, Cvoid, (UInt8, Int32, Int32, Int32,))
 end
 
+"""
+@mousepressed expr
+Define a callback triggered when a mouse button is pressed.
 
+# Arguments
+- `BUTTON`: The `MouseButton` that was pressed. Can be compared against 
+  `MouseButton` objects, symbols (e.g., `:left`, `:right`, `:middle`), 
+  or strings (e.g., `"left"`).
+"""
 macro mousepressed(expr)
     b = esc(:BUTTON)
     return quote
@@ -197,6 +220,13 @@ macro mousepressed(expr)
     end
 end
 
+"""
+@mousereleased expr
+Define a callback triggered when a mouse button is released.
+
+# Arguments
+- `BUTTON`: The `MouseButton` that was released.
+"""
 macro mousereleased(expr)
     b = esc(:BUTTON)
     return quote
@@ -206,6 +236,14 @@ macro mousereleased(expr)
     end
 end
 
+"""
+@mousewheel expr
+Define a callback triggered by mouse wheel movement.
+
+# Arguments
+- `WHEEL`: A `Point` object where `WHEEL.x` represents horizontal movement 
+  and `WHEEL.y` represents vertical movement.
+"""
 macro mousewheel(expr)
     a = esc(:WHEEL)
     return quote
@@ -215,6 +253,12 @@ macro mousewheel(expr)
     end
 end
 
+"""
+@mousemoved expr
+Define a callback triggered when the mouse is moved.
+
+No arguments are provided to the block.
+"""
 macro mousemoved(expr)
     return quote
         $(@__MODULE__).on_mouse_moved[] = () -> begin
@@ -223,6 +267,12 @@ macro mousemoved(expr)
     end
 end
 
+"""
+@mousedragged expr
+Define a callback triggered when the mouse is dragged.
+
+Use mouse() to query current and previous mouse position, see [`mouse`](@ref)
+"""
 macro mousedragged(expr)
     return quote
         $(@__MODULE__).on_mouse_dragged[] = () -> begin
@@ -231,6 +281,17 @@ macro mousedragged(expr)
     end
 end
 
+
+"""
+@keypressed expr
+Define a callback triggered when a key is pressed.
+
+# Arguments
+- `KEY`: The `Key` object representing the key pressed.
+- `SHIFT`: A `Bool` indicating if the Shift key is held.
+- `CTRL`: A `Bool` indicating if the Ctrl key is held.
+- `ALT`: A `Bool` indicating if the Alt key is held.
+"""
 macro keypressed(expr)
     a = esc(:KEY)
     b = esc(:SHIFT)
@@ -243,6 +304,16 @@ macro keypressed(expr)
     end
 end
 
+"""
+@keyreleased expr
+Define a callback triggered when a key is released.
+
+# Arguments
+- `KEY`: The `Key` object representing the key released.
+- `SHIFT`: A `Bool` indicating if the Shift key is held.
+- `CTRL`: A `Bool` indicating if the Ctrl key is held.
+- `ALT`: A `Bool` indicating if the Alt key is held.
+"""
 macro keyreleased(expr)
     a = esc(:KEY)
     b = esc(:SHIFT)
