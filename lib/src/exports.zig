@@ -10,7 +10,7 @@ pub export fn error_string(err: u32) [*:0]const u8 {
 }
 
 pub export fn init(w: u32, h: u32) ErrorCode {
-    root.init.init(w, h) catch |e| {
+    root.init.init_app(.{ .w = w, .h = h }) catch |e| {
         return @intFromError(e);
     };
     return 0;
@@ -60,7 +60,7 @@ pub export fn present() ErrorCode {
 }
 
 pub export fn delay(ns: u64) void {
-    root.sdl.SDL_DelayNS(ns);
+    root.sdl.c.SDL_DelayNS(ns);
 }
 
 pub export fn window_close_requested() i32 {
@@ -473,13 +473,13 @@ pub export fn get_mouse_state(x: ?*f32, y: ?*f32, x_prev: ?*f32, y_prev: ?*f32, 
         y_prev.?.* = root.pictura_app.event_handler.mouse.y_prev;
     }
     if (left != null) {
-        left.?.* = @intFromBool(root.pictura_app.event_handler.mouse.buttons[root.sdl.SDL_BUTTON_LEFT]);
+        left.?.* = @intFromBool(root.pictura_app.event_handler.mouse.buttons[root.sdl.c.SDL_BUTTON_LEFT]);
     }
     if (middle != null) {
-        middle.?.* = @intFromBool(root.pictura_app.event_handler.mouse.buttons[root.sdl.SDL_BUTTON_MIDDLE]);
+        middle.?.* = @intFromBool(root.pictura_app.event_handler.mouse.buttons[root.sdl.c.SDL_BUTTON_MIDDLE]);
     }
     if (right != null) {
-        right.?.* = @intFromBool(root.pictura_app.event_handler.mouse.buttons[root.sdl.SDL_BUTTON_RIGHT]);
+        right.?.* = @intFromBool(root.pictura_app.event_handler.mouse.buttons[root.sdl.c.SDL_BUTTON_RIGHT]);
     }
 }
 
@@ -488,7 +488,7 @@ pub export fn is_key_pressed(key: u8) i32 {
 }
 
 pub export fn set_mouse_position(x: f32, y: f32) void {
-    root.sdl_utils.set_mouse_position(root.pictura_app.window, x, y);
+    root.sdl.utils.set_mouse_position(root.pictura_app.window, x, y);
 }
 
 pub export fn set_mouse_pressed_fn(f: *const fn (x: f32, y: f32, button: u32) callconv(.c) void) void {
@@ -514,42 +514,48 @@ pub export fn set_key_released_fn(f: *const fn (key: u8, shift: i32, ctrl: i32, 
 }
 
 pub export fn get_display_refresh_rate() f32 {
-    const r = root.sdl_utils.get_display_refresh_rate(root.pictura_app.window) catch {
-        return 60.0; // sensible default instead of something like 0
+    const display = root.sdl.utils.get_display_from_window(root.pictura_app.window) catch {
+        return 60;
     };
-    return r;
+    const r = root.sdl.utils.get_refresh_rate(display) catch {
+        return 60; // sensible default instead of something like 0
+    };
+    return @floatCast(r);
 }
 
 pub export fn get_display_size(w: *u32, h: *u32) ErrorCode {
-    w.*, h.* = root.sdl_utils.get_display_size(root.pictura_app.window) catch |e| {
+    const display = root.sdl.utils.get_display_from_window(root.pictura_app.window) catch |e| {
+        return @intFromError(e);
+    };
+    w.*, h.* = root.sdl.utils.get_display_size(display) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn get_window_position(w: *i32, h: *i32) ErrorCode {
-    w.*, h.* = root.sdl_utils.get_window_position(root.pictura_app.window) catch |e| {
+    w.*, h.* = root.sdl.utils.get_window_position(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn set_window_position(x: i32, y: i32) ErrorCode {
-    root.sdl_utils.set_window_position(root.pictura_app.window, x, y) catch |e| {
+    root.sdl.utils.set_window_position(root.pictura_app.window, x, y) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn set_fullscreen() ErrorCode {
-    root.sdl_utils.set_fullscreen(&root.pictura_app) catch |e| {
+    root.sdl.utils.set_fullscreen(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn set_windowed() ErrorCode {
-    root.sdl_utils.set_windowed(&root.pictura_app) catch |e| {
+    root.sdl.utils.set_windowed(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
@@ -561,35 +567,35 @@ pub export fn get_window_size(w: *u32, h: *u32) void {
 }
 
 pub export fn set_window_size(w: u32, h: u32) ErrorCode {
-    root.sdl_utils.set_window_size(&root.pictura_app, w, h) catch |e| {
+    root.sdl.utils.set_window_size(root.pictura_app.window, w, h) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn set_bordered() ErrorCode {
-    root.sdl_utils.set_bordered(root.pictura_app.window) catch |e| {
+    root.sdl.utils.set_bordered(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn set_borderless() ErrorCode {
-    root.sdl_utils.set_borderless(root.pictura_app.window) catch |e| {
+    root.sdl.utils.set_borderless(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn grab_mouse() ErrorCode {
-    root.sdl_utils.grab_mouse(root.pictura_app.window) catch |e| {
+    root.sdl.utils.grab_mouse(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
 }
 
 pub export fn release_mouse() ErrorCode {
-    root.sdl_utils.release_mouse(root.pictura_app.window) catch |e| {
+    root.sdl.utils.release_mouse(root.pictura_app.window) catch |e| {
         return @intFromError(e);
     };
     return 0;
@@ -598,63 +604,63 @@ pub export fn release_mouse() ErrorCode {
 //
 // Vulkan exports for the power users:)
 //
-pub export fn get_vk_instance() root.vulkan.VkInstance {
+pub export fn get_vk_instance() root.vulkan.c.VkInstance {
     return root.pictura_app.instance;
 }
-pub export fn get_vk_physical_device() root.vulkan.VkPhysicalDevice {
+pub export fn get_vk_physical_device() root.vulkan.c.VkPhysicalDevice {
     return root.pictura_app.physical_device;
 }
-pub export fn get_vk_device() root.vulkan.VkDevice {
+pub export fn get_vk_device() root.vulkan.c.VkDevice {
     return root.pictura_app.device;
 }
 pub export fn get_vk_queue_family_index() u32 {
     return root.pictura_app.queue_family_index;
 }
-pub export fn get_vk_queue() root.vulkan.VkQueue {
+pub export fn get_vk_queue() root.vulkan.c.VkQueue {
     return root.pictura_app.queue;
 }
 
-pub export fn init2(
-    w: u32,
-    h: u32,
-    nr_instance_extensions: u32,
-    instance_extensions: ?[*][*:0]const u8,
-    nr_vk_layers: u32,
-    vulkan_layers: ?[*][*:0]const u8,
-    features: ?*anyopaque,
-    nr_device_extensions: u32,
-    device_extensions: ?[*][*:0]const u8,
-) ErrorCode {
-    const inst_ext = if (instance_extensions != null and nr_instance_extensions != 0)
-        instance_extensions.?[0..nr_instance_extensions]
-    else
-        null;
+// pub export fn init2(
+//     w: u32,
+//     h: u32,
+//     nr_instance_extensions: u32,
+//     instance_extensions: ?[*][*:0]const u8,
+//     nr_vk_layers: u32,
+//     vulkan_layers: ?[*][*:0]const u8,
+//     features: ?*anyopaque,
+//     nr_device_extensions: u32,
+//     device_extensions: ?[*][*:0]const u8,
+// ) ErrorCode {
+//     const inst_ext = if (instance_extensions != null and nr_instance_extensions != 0)
+//         instance_extensions.?[0..nr_instance_extensions]
+//     else
+//         null;
 
-    const layers = if (vulkan_layers != null and nr_vk_layers != 0)
-        vulkan_layers.?[0..nr_vk_layers]
-    else
-        null;
+//     const layers = if (vulkan_layers != null and nr_vk_layers != 0)
+//         vulkan_layers.?[0..nr_vk_layers]
+//     else
+//         null;
 
-    const dev_ext = if (device_extensions != null and nr_device_extensions != 0)
-        device_extensions.?[0..nr_device_extensions]
-    else
-        null;
+//     const dev_ext = if (device_extensions != null and nr_device_extensions != 0)
+//         device_extensions.?[0..nr_device_extensions]
+//     else
+//         null;
 
-    root.init.init2(
-        w,
-        h,
-        inst_ext,
-        layers,
-        features,
-        dev_ext,
-    ) catch |e| {
-        return @intFromError(e);
-    };
+//     root.init.init2(
+//         w,
+//         h,
+//         inst_ext,
+//         layers,
+//         features,
+//         dev_ext,
+//     ) catch |e| {
+//         return @intFromError(e);
+//     };
 
-    return 0;
-}
+//     return 0;
+// }
 
-pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) ErrorCode {
+pub export fn get_vk_command_buffer(out: *root.vulkan.c.VkCommandBuffer) ErrorCode {
     const bf = root.pictura_app.well.record(root.pictura_app.device) catch |e| {
         return @intFromError(e);
     };
@@ -664,11 +670,11 @@ pub export fn get_vk_command_buffer(out: *root.vulkan.VkCommandBuffer) ErrorCode
 
 // already called begin rendering and did the memory barrier for the render target image
 // no need to call end rendering yerself, just call present()
-pub export fn get_vk_command_buffer_with_render_target(out: *root.vulkan.VkCommandBuffer, image: Image) ErrorCode {
+pub export fn get_vk_command_buffer_with_render_target(out: *root.vulkan.c.VkCommandBuffer, image: Image) ErrorCode {
     const dst: *root.image.PicturaImage = @ptrCast(@alignCast(image));
 
     // the user cannot access image internals, so the barrier that gets generated here is correct (the user cannot do their own diy vulkan reading and writing from/to the texture)
-    var barrier = root.utils.get_image_memory_barrier(dst, .draw_dst, root.pictura_app.queue_family_index);
+    var barrier = root.vulkan.utils.get_image_memory_barrier(dst, .draw_dst, root.pictura_app.queue_family_index);
 
     const bf = root.pictura_app.well.render_into(dst, &barrier, root.pictura_app.device) catch |e| {
         return @intFromError(e);
@@ -679,11 +685,11 @@ pub export fn get_vk_command_buffer_with_render_target(out: *root.vulkan.VkComma
 }
 
 // for no performance compromise :)
-pub export fn get_vk_proc_addr(fn_name: [*:0]const u8) root.vulkan.PFN_vkVoidFunction {
-    return @ptrCast(root.vulkan.vkGetDeviceProcAddr.?(root.pictura_app.device, fn_name));
+pub export fn get_vk_proc_addr(fn_name: [*:0]const u8) root.vulkan.c.PFN_vkVoidFunction {
+    return @ptrCast(root.vulkan.c.vkGetDeviceProcAddr.?(root.pictura_app.device, fn_name));
 }
 
 // for completeness
-pub export fn get_vk_instance_proc_addr(fn_name: [*:0]const u8) root.vulkan.PFN_vkVoidFunction {
-    return @ptrCast(root.vulkan.vkGetInstanceProcAddr.?(root.pictura_app.instance, fn_name));
+pub export fn get_vk_instance_proc_addr(fn_name: [*:0]const u8) root.vulkan.c.PFN_vkVoidFunction {
+    return @ptrCast(root.vulkan.c.vkGetInstanceProcAddr.?(root.pictura_app.instance, fn_name));
 }

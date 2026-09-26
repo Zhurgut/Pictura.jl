@@ -8,3 +8,5 @@ stderr
 picturalib/
 *.tar.gz
 *.code-workspace
+
+info.log

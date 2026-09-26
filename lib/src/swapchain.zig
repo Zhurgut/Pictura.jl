@@ -3,34 +3,34 @@ const root = @import("root.zig");
 const vulkan = root.vulkan;
 const image = root.image;
 const PicturaImage = image.PicturaImage;
-const utils = root.utils;
+const utils = vulkan.utils;
 const shaders = root.shaders;
 
 pub const Swapchain = struct {
-    swapchain: vulkan.VkSwapchainKHR,
+    swapchain: vulkan.c.VkSwapchainKHR,
     images: [3]PicturaImage,
-    img_format: vulkan.VkFormat,
-    view_format: vulkan.VkFormat,
+    img_format: vulkan.c.VkFormat,
+    view_format: vulkan.c.VkFormat,
     semaphores: SemaphoreClub(4),
     request_recreation: bool = false,
 
-    fn unorm_format(format: vulkan.VkFormat) vulkan.VkFormat {
+    fn unorm_format(format: vulkan.c.VkFormat) vulkan.c.VkFormat {
         return switch (format) {
-            vulkan.VK_FORMAT_B8G8R8A8_SRGB => vulkan.VK_FORMAT_B8G8R8A8_UNORM,
-            vulkan.VK_FORMAT_R8G8B8A8_SRGB => vulkan.VK_FORMAT_R8G8B8A8_UNORM,
-            vulkan.VK_FORMAT_B8G8R8A8_UNORM => vulkan.VK_FORMAT_B8G8R8A8_UNORM,
-            vulkan.VK_FORMAT_R8G8B8A8_UNORM => vulkan.VK_FORMAT_R8G8B8A8_UNORM,
-            vulkan.VK_FORMAT_A8B8G8R8_SRGB_PACK32 => vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
-            vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32 => vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
+            vulkan.c.VK_FORMAT_B8G8R8A8_SRGB => vulkan.c.VK_FORMAT_B8G8R8A8_UNORM,
+            vulkan.c.VK_FORMAT_R8G8B8A8_SRGB => vulkan.c.VK_FORMAT_R8G8B8A8_UNORM,
+            vulkan.c.VK_FORMAT_B8G8R8A8_UNORM => vulkan.c.VK_FORMAT_B8G8R8A8_UNORM,
+            vulkan.c.VK_FORMAT_R8G8B8A8_UNORM => vulkan.c.VK_FORMAT_R8G8B8A8_UNORM,
+            vulkan.c.VK_FORMAT_A8B8G8R8_SRGB_PACK32 => vulkan.c.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
+            vulkan.c.VK_FORMAT_A8B8G8R8_UNORM_PACK32 => vulkan.c.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
             else => unreachable,
         };
     }
 
     pub fn create(
-        physical_device: vulkan.VkPhysicalDevice,
-        device: vulkan.VkDevice,
+        physical_device: vulkan.c.VkPhysicalDevice,
+        device: vulkan.c.VkDevice,
         queue_family_index: u32,
-        surface: vulkan.VkSurfaceKHR,
+        surface: vulkan.c.VkSurfaceKHR,
         w: u32,
         h: u32,
     ) !Swapchain {
@@ -42,13 +42,13 @@ pub const Swapchain = struct {
         const actual_h = std.math.clamp(h, capabilites.minImageExtent.height, capabilites.maxImageExtent.height);
 
         const swapchain = try create_swapchain(device, surface, actual_w, actual_h, format, colorspace, null);
-        errdefer vulkan.vkDestroySwapchainKHR.?(device, swapchain, null);
+        errdefer vulkan.c.vkDestroySwapchainKHR.?(device, swapchain, null);
 
         var count: u32 = 3;
-        var images: [3]vulkan.VkImage = undefined;
-        const result = vulkan.vkGetSwapchainImagesKHR.?(device, swapchain, &count, &images);
-        if (result != vulkan.VK_SUCCESS and result != vulkan.VK_INCOMPLETE) {
-            std.debug.print("failed to get swapchain images: {s}\n", .{vulkan.string_VkResult(result)});
+        var images: [3]vulkan.c.VkImage = undefined;
+        const result = vulkan.c.vkGetSwapchainImagesKHR.?(device, swapchain, &count, &images);
+        if (result != vulkan.c.VK_SUCCESS and result != vulkan.c.VK_INCOMPLETE) {
+            std.debug.print("failed to get swapchain images: {s}\n", .{vulkan.c.string_VkResult(result)});
             return error.Vk_failed_to_get_swapchain_images;
         }
 
@@ -72,7 +72,7 @@ pub const Swapchain = struct {
                 .pixels = null,
             };
             errdefer {
-                vulkan.vkDestroyImageView.?(device, out.images[i].image_view, null);
+                vulkan.c.vkDestroyImageView.?(device, out.images[i].image_view, null);
             }
         }
 
@@ -86,18 +86,19 @@ pub const Swapchain = struct {
 
     // pub fn recreate() Swapchain {}
 
-    pub fn destroy(swapchain: *Swapchain, device: vulkan.VkDevice) void {
+    pub fn destroy(swapchain: *Swapchain, device: vulkan.c.VkDevice) void {
         for (swapchain.images) |img| {
-            vulkan.vkDestroyImageView.?(device, img.image_view, null);
+            root.logger.log_destruction(img.image_view);
+            vulkan.c.vkDestroyImageView.?(device, img.image_view, null);
         }
         swapchain.semaphores.destroy(device);
-        vulkan.vkDestroySwapchainKHR.?(device, swapchain.swapchain, null);
+        vulkan.c.vkDestroySwapchainKHR.?(device, swapchain.swapchain, null);
     }
 
     pub fn present(swapchain: *Swapchain, app: *root.PicturaApp) !void {
         _ = try app.well.submit(app.device, app.queue, null, null, null, null); // we dont want all the previous work to wait for image acquired, so submit it right away
 
-        var image_acquired: vulkan.VkSemaphore = undefined;
+        var image_acquired: vulkan.c.VkSemaphore = undefined;
         const ready = swapchain.semaphores.if_ready_get_image_acquired_semaphore(app.device, &image_acquired);
 
         if (!ready) {
@@ -105,26 +106,26 @@ pub const Swapchain = struct {
         }
 
         var image_index: u32 = 0;
-        const acquire_image_success = vulkan.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired, null, &image_index);
+        const acquire_image_success = vulkan.c.vkAcquireNextImageKHR.?(app.device, swapchain.swapchain, 0, image_acquired, null, &image_index);
 
         switch (acquire_image_success) {
-            vulkan.VK_SUCCESS => {},
-            vulkan.VK_SUBOPTIMAL_KHR => {
+            vulkan.c.VK_SUCCESS => {},
+            vulkan.c.VK_SUBOPTIMAL_KHR => {
                 swapchain.request_recreation = true;
             },
-            vulkan.VK_TIMEOUT, vulkan.VK_NOT_READY => {
+            vulkan.c.VK_TIMEOUT, vulkan.c.VK_NOT_READY => {
                 // there is a sempaphore that's ready, but the swapchain does not have an image ready
                 swapchain.semaphores.cancel(); // reset the image acquired semaphore to ready
                 return;
             },
-            vulkan.VK_ERROR_OUT_OF_DATE_KHR => {
+            vulkan.c.VK_ERROR_OUT_OF_DATE_KHR => {
                 // If VK_ERROR_OUT_OF_DATE_KHR is returned, no image is acquired...
                 // Applications need to create a new swapchain for the surface to continue presenting if VK_ERROR_OUT_OF_DATE_KHR is returned.
                 swapchain.request_recreation = true;
                 return;
             },
             else => {
-                std.debug.print("acquire image: {s}\n", .{vulkan.string_VkResult(acquire_image_success)});
+                std.debug.print("acquire image: {s}\n", .{vulkan.c.string_VkResult(acquire_image_success)});
                 return error.failed_to_acquire_image;
             },
         }
@@ -152,15 +153,15 @@ pub const Swapchain = struct {
             app.device,
             app.queue,
             image_acquired,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            vulkan.c.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             ready_to_present,
-            vulkan.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            vulkan.c.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
         );
 
         try swapchain.semaphores.submitted_acquired_semaphore(app.queue);
 
-        const present_info: vulkan.VkPresentInfoKHR = .{
-            .sType = vulkan.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        const present_info: vulkan.c.VkPresentInfoKHR = .{
+            .sType = vulkan.c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = null,
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &(ready_to_present),
@@ -170,15 +171,15 @@ pub const Swapchain = struct {
             .pResults = null,
         };
 
-        const result = vulkan.vkQueuePresentKHR.?(app.queue, &present_info);
+        const result = vulkan.c.vkQueuePresentKHR.?(app.queue, &present_info);
 
         switch (result) {
-            vulkan.VK_SUCCESS => {},
-            vulkan.VK_SUBOPTIMAL_KHR, vulkan.VK_ERROR_OUT_OF_DATE_KHR => {
+            vulkan.c.VK_SUCCESS => {},
+            vulkan.c.VK_SUBOPTIMAL_KHR, vulkan.c.VK_ERROR_OUT_OF_DATE_KHR => {
                 swapchain.request_recreation = true;
             },
             else => {
-                std.debug.print("failed to present: {s}\n", .{vulkan.string_VkResult(result)});
+                std.debug.print("failed to present: {s}\n", .{vulkan.c.string_VkResult(result)});
                 return error.Vk_failed_to_present;
             },
         }
@@ -189,46 +190,51 @@ pub fn SemaphoreClub(comptime n: u32) type {
     return struct {
         // semaphores for acquiring images from the swapchain, signal when image is ready
         // can only be reused once the image with the same index has been acquired from the swapchain again
-        image_acquired: [n]vulkan.VkSemaphore,
-        fences: [n]vulkan.VkFence,
+        image_acquired: [n]vulkan.c.VkSemaphore,
+        fences: [n]vulkan.c.VkFence,
         last_image_acquired_semaphore_index: u32,
         used_by_image_index: [n]i32, // -1 means not in use anymore
 
         // semaphores to wait on before presenting
         // we only know a semaphore has been waited on, once the image of the corresponding present operation has been reacquired
-        ready_to_present: [n]vulkan.VkSemaphore,
+        ready_to_present: [n]vulkan.c.VkSemaphore,
 
-        pub fn create(device: vulkan.VkDevice) !SemaphoreClub(n) {
+        pub fn create(device: vulkan.c.VkDevice) !SemaphoreClub(n) {
             var out: SemaphoreClub(n) = undefined;
             for (0..n) |i| {
                 out.image_acquired[i] = try utils.create_semaphore(device);
-                errdefer vulkan.vkDestroySemaphore.?(device, out.image_acquired[i], null);
+                errdefer vulkan.c.vkDestroySemaphore.?(device, out.image_acquired[i], null);
 
-                out.fences[i] = try utils.create_fence(device, vulkan.VK_FENCE_CREATE_SIGNALED_BIT);
-                errdefer vulkan.vkDestroyFence.?(device, out.fences[i], null);
+                out.fences[i] = try utils.create_fence(device, vulkan.c.VK_FENCE_CREATE_SIGNALED_BIT);
+                errdefer vulkan.c.vkDestroyFence.?(device, out.fences[i], null);
 
                 out.used_by_image_index[i] = -1;
 
                 out.ready_to_present[i] = try utils.create_semaphore(device);
-                errdefer vulkan.vkDestroySemaphore.?(device, out.ready_to_present[i], null);
+                errdefer vulkan.c.vkDestroySemaphore.?(device, out.ready_to_present[i], null);
             }
 
             return out;
         }
 
-        pub fn destroy(sems: *SemaphoreClub(n), device: vulkan.VkDevice) void {
+        pub fn destroy(sems: *SemaphoreClub(n), device: vulkan.c.VkDevice) void {
             for (0..n) |i| {
-                vulkan.vkDestroySemaphore.?(device, sems.image_acquired[i], null);
-                vulkan.vkDestroySemaphore.?(device, sems.ready_to_present[i], null);
-                vulkan.vkDestroyFence.?(device, sems.fences[i], null);
+                root.logger.log_destruction(sems.image_acquired[i]);
+                vulkan.c.vkDestroySemaphore.?(device, sems.image_acquired[i], null);
+
+                root.logger.log_destruction(sems.ready_to_present[i]);
+                vulkan.c.vkDestroySemaphore.?(device, sems.ready_to_present[i], null);
+
+                root.logger.log_destruction(sems.fences[i]);
+                vulkan.c.vkDestroyFence.?(device, sems.fences[i], null);
             }
         }
 
-        pub fn if_ready_get_image_acquired_semaphore(sems: *SemaphoreClub(n), device: vulkan.VkDevice, sm: *vulkan.VkSemaphore) bool {
+        pub fn if_ready_get_image_acquired_semaphore(sems: *SemaphoreClub(n), device: vulkan.c.VkDevice, sm: *vulkan.c.VkSemaphore) bool {
             for (0..n) |i| {
                 if (sems.used_by_image_index[i] == -1) {
-                    const result = vulkan.vkGetFenceStatus.?(device, sems.fences[i]);
-                    if (result == vulkan.VK_NOT_READY) {
+                    const result = vulkan.c.vkGetFenceStatus.?(device, sems.fences[i]);
+                    if (result == vulkan.c.VK_NOT_READY) {
                         return false;
                     }
 
@@ -246,14 +252,14 @@ pub fn SemaphoreClub(comptime n: u32) type {
             sems.used_by_image_index[sems.last_image_acquired_semaphore_index] = -1; // set it back to -1
         }
 
-        pub fn using_image_index(sems: *SemaphoreClub(n), device: vulkan.VkDevice, idx: u32) !void {
+        pub fn using_image_index(sems: *SemaphoreClub(n), device: vulkan.c.VkDevice, idx: u32) !void {
             // when image acquire succeeds, call this function so the semaphore club knows what swapchain image the last semaphore is used with,
             // so it knows when the semaphore is safe to reuse again
 
             // acquire image succeeded so we can reset the fence
-            const result = vulkan.vkResetFences.?(device, 1, &sems.fences[sems.last_image_acquired_semaphore_index]);
-            if (result != vulkan.VK_SUCCESS) {
-                std.debug.print("failed to reset fence: {s}\n", .{vulkan.string_VkResult(result)});
+            const result = vulkan.c.vkResetFences.?(device, 1, &sems.fences[sems.last_image_acquired_semaphore_index]);
+            if (result != vulkan.c.VK_SUCCESS) {
+                std.debug.print("failed to reset fence: {s}\n", .{vulkan.c.string_VkResult(result)});
                 return error.Vk_failed_to_reset_fence;
             }
 
@@ -266,58 +272,58 @@ pub fn SemaphoreClub(comptime n: u32) type {
             // std.debug.print("[{d}] {d} {d} {d} {d}\n", .{ idx, sems.used_by_image_index[0], sems.used_by_image_index[1], sems.used_by_image_index[2], sems.used_by_image_index[3] });
         }
 
-        pub fn submitted_acquired_semaphore(sems: *SemaphoreClub(n), queue: vulkan.VkQueue) !void {
+        pub fn submitted_acquired_semaphore(sems: *SemaphoreClub(n), queue: vulkan.c.VkQueue) !void {
             // so we submit the corresponding fence as well, so we know when we can use the semaphore again
-            var submit_info = std.mem.zeroes(vulkan.VkSubmitInfo2);
-            submit_info.sType = vulkan.VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            var submit_info = std.mem.zeroes(vulkan.c.VkSubmitInfo2);
+            submit_info.sType = vulkan.c.VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
 
-            const result = vulkan.vkQueueSubmit2.?(queue, 1, &submit_info, sems.fences[sems.last_image_acquired_semaphore_index]); // only submit fence
-            if (result != vulkan.VK_SUCCESS) {
-                std.debug.print("failed to submit to queue: {s}\n", .{vulkan.string_VkResult(result)});
+            const result = vulkan.c.vkQueueSubmit2.?(queue, 1, &submit_info, sems.fences[sems.last_image_acquired_semaphore_index]); // only submit fence
+            if (result != vulkan.c.VK_SUCCESS) {
+                std.debug.print("failed to submit to queue: {s}\n", .{vulkan.c.string_VkResult(result)});
                 return error.Vk_failed_to_submit_to_queue;
             }
         }
 
-        pub fn get_ready_to_present_semaphore(sems: *SemaphoreClub(n)) vulkan.VkSemaphore {
+        pub fn get_ready_to_present_semaphore(sems: *SemaphoreClub(n)) vulkan.c.VkSemaphore {
             return sems.ready_to_present[sems.last_image_acquired_semaphore_index];
         }
     };
 }
 
-fn get_infos(physical_device: vulkan.VkPhysicalDevice, queue_family_index: u32, surface: vulkan.VkSurfaceKHR) !struct { vulkan.VkSurfaceCapabilitiesKHR, vulkan.VkFormat, vulkan.VkColorSpaceKHR } {
-    var supported: vulkan.VkBool32 = vulkan.VK_FALSE;
-    var result = vulkan.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device, queue_family_index, surface, &supported);
-    if (result != vulkan.VK_SUCCESS) {
-        std.debug.print("failed to check if surface is supported: {s}\n", .{vulkan.string_VkResult(result)});
+fn get_infos(physical_device: vulkan.c.VkPhysicalDevice, queue_family_index: u32, surface: vulkan.c.VkSurfaceKHR) !struct { vulkan.c.VkSurfaceCapabilitiesKHR, vulkan.c.VkFormat, vulkan.c.VkColorSpaceKHR } {
+    var supported: vulkan.c.VkBool32 = vulkan.c.VK_FALSE;
+    var result = vulkan.c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device, queue_family_index, surface, &supported);
+    if (result != vulkan.c.VK_SUCCESS) {
+        std.debug.print("failed to check if surface is supported: {s}\n", .{vulkan.c.string_VkResult(result)});
         return error.Vk_failed_to_initialize_vulkan;
     }
-    if (supported == vulkan.VK_FALSE) {
+    if (supported == vulkan.c.VK_FALSE) {
         return error.surface_not_supported_by_physical_device; // shrug
     }
 
-    var capabilities: vulkan.VkSurfaceCapabilitiesKHR = undefined;
-    result = vulkan.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device, surface, &capabilities);
+    var capabilities: vulkan.c.VkSurfaceCapabilitiesKHR = undefined;
+    result = vulkan.c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device, surface, &capabilities);
     // min and max image count in swapchain, min max extent, ...
     // supported transforms, supported usage flags
-    // std.debug.assert(capabilities.supportedUsageFlags & vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT != 0); // for example
+    // std.debug.assert(capabilities.supportedUsageFlags & vulkan.c.VK_IMAGE_USAGE_TRANSFER_DST_BIT != 0); // for example
 
     var nr_formats: u32 = 0;
-    var formats_buf: [20]vulkan.VkSurfaceFormatKHR = undefined;
+    var formats_buf: [20]vulkan.c.VkSurfaceFormatKHR = undefined;
 
-    result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, null);
+    result = vulkan.c.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, null);
     std.debug.assert(20 > nr_formats);
-    result = vulkan.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, &formats_buf);
+    result = vulkan.c.vkGetPhysicalDeviceSurfaceFormatsKHR.?(physical_device, surface, &nr_formats, &formats_buf);
 
     const formats = formats_buf[0..nr_formats];
-    var final_format: ?vulkan.VkFormat = null;
+    var final_format: ?vulkan.c.VkFormat = null;
 
-    outer: for ([6]vulkan.VkFormat{
-        vulkan.VK_FORMAT_B8G8R8A8_SRGB,
-        vulkan.VK_FORMAT_R8G8B8A8_SRGB,
-        vulkan.VK_FORMAT_A8B8G8R8_SRGB_PACK32,
-        vulkan.VK_FORMAT_B8G8R8A8_UNORM,
-        vulkan.VK_FORMAT_R8G8B8A8_UNORM,
-        vulkan.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
+    outer: for ([6]vulkan.c.VkFormat{
+        vulkan.c.VK_FORMAT_B8G8R8A8_SRGB,
+        vulkan.c.VK_FORMAT_R8G8B8A8_SRGB,
+        vulkan.c.VK_FORMAT_A8B8G8R8_SRGB_PACK32,
+        vulkan.c.VK_FORMAT_B8G8R8A8_UNORM,
+        vulkan.c.VK_FORMAT_R8G8B8A8_UNORM,
+        vulkan.c.VK_FORMAT_A8B8G8R8_UNORM_PACK32,
     }) |target_format| {
         for (formats) |available_format| {
             if (target_format == available_format.format) {
@@ -335,47 +341,47 @@ fn get_infos(physical_device: vulkan.VkPhysicalDevice, queue_family_index: u32, 
 }
 
 pub fn create_swapchain(
-    device: vulkan.VkDevice,
-    surface: vulkan.VkSurfaceKHR,
+    device: vulkan.c.VkDevice,
+    surface: vulkan.c.VkSurfaceKHR,
     w: u32,
     h: u32,
-    format: vulkan.VkFormat,
-    colorspace: vulkan.VkColorSpaceKHR,
-    old_swapchain: vulkan.VkSwapchainKHR,
-) !vulkan.VkSwapchainKHR {
+    format: vulkan.c.VkFormat,
+    colorspace: vulkan.c.VkColorSpaceKHR,
+    old_swapchain: vulkan.c.VkSwapchainKHR,
+) !vulkan.c.VkSwapchainKHR {
     const view_format = Swapchain.unorm_format(format);
 
-    const view_formats = [2]vulkan.VkFormat{ format, view_format };
+    const view_formats = [2]vulkan.c.VkFormat{ format, view_format };
 
-    const view_format_list: vulkan.VkImageFormatListCreateInfo = .{
-        .sType = vulkan.VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO,
+    const view_format_list: vulkan.c.VkImageFormatListCreateInfo = .{
+        .sType = vulkan.c.VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO,
         .pNext = null,
         .viewFormatCount = 2,
         .pViewFormats = &view_formats,
     };
 
-    const info: vulkan.VkSwapchainCreateInfoKHR = .{
-        .sType = vulkan.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    const info: vulkan.c.VkSwapchainCreateInfoKHR = .{
+        .sType = vulkan.c.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = &view_format_list,
-        .flags = vulkan.VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR,
+        .flags = vulkan.c.VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR,
         .surface = surface,
         .minImageCount = 3, // TODO not to hardcode this
         .imageFormat = format,
         .imageColorSpace = colorspace,
         .imageExtent = .{ .width = w, .height = h },
         .imageArrayLayers = 1,
-        .imageUsage = vulkan.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT, // ???
-        .preTransform = vulkan.VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-        .compositeAlpha = vulkan.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = vulkan.VK_PRESENT_MODE_FIFO_KHR,
+        .imageUsage = vulkan.c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vulkan.c.VK_IMAGE_USAGE_TRANSFER_DST_BIT, // ???
+        .preTransform = vulkan.c.VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+        .compositeAlpha = vulkan.c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = vulkan.c.VK_PRESENT_MODE_FIFO_KHR,
         .oldSwapchain = old_swapchain,
     };
 
-    var swapchain: vulkan.VkSwapchainKHR = undefined;
-    const result = vulkan.vkCreateSwapchainKHR.?(device, &info, null, &swapchain);
+    var swapchain: vulkan.c.VkSwapchainKHR = undefined;
+    const result = vulkan.c.vkCreateSwapchainKHR.?(device, &info, null, &swapchain);
 
-    if (result != vulkan.VK_SUCCESS) {
-        std.debug.print("failed to create swapchain: {s}\n", .{vulkan.string_VkResult(result)});
+    if (result != vulkan.c.VK_SUCCESS) {
+        std.debug.print("failed to create swapchain: {s}\n", .{vulkan.c.string_VkResult(result)});
         return error.Vk_failed_to_create_swapchain;
     }
 
