@@ -197,7 +197,7 @@ pub fn print_info() !void {
 }
 
 test "sdl display infos" {
-    _ = sdl.c.SDL_SetHint(sdl.c.SDL_HINT_VIDEO_DRIVER, "wayland");
+    // _ = sdl.c.SDL_SetHint(sdl.c.SDL_HINT_VIDEO_DRIVER, "wayland");
     try root.init.init_app(.{ .w = 800, .h = 600 });
 
     const pictura_app = &root.pictura_app;
@@ -277,7 +277,7 @@ test "sdl utils" {
         }
 
         fn run() !void {
-            _ = sdl.c.SDL_SetHint(sdl.c.SDL_HINT_VIDEO_DRIVER, "wayland");
+            // _ = sdl.c.SDL_SetHint(sdl.c.SDL_HINT_VIDEO_DRIVER, "wayland");
             try root.init.init_app(.{ .w = 800, .h = 600 });
 
             std.debug.print("refresh rate: {d}\n", .{get_refresh_rate(try get_display_from_window(root.pictura_app.window)) catch -1});

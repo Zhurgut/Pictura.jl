@@ -123,7 +123,7 @@ pub export fn load_pixels(image: Image) ?[*]u32 {
     const pixels = root.image.load_pixels(@ptrCast(@alignCast(image)), &root.pictura_app) catch {
         return null;
     };
-    return pixels;
+    return pixels.ptr;
 }
 
 pub export fn update_pixels(image: Image) ErrorCode {

@@ -75,7 +75,7 @@ pub const PicturaImage = struct {
     last_op: Op,
     staging_buffer: ?vulkan.c.VkBuffer,
     staging_buffer_memory: ?vulkan.c.VkDeviceMemory,
-    pixels: ?[*]u32, // ptr to pixels in host memory
+    pixels: ?[]u32, // ptr to pixels in host memory
 
     pub fn create(w: u32, h: u32, device: vulkan.c.VkDevice, queue_family_index: u32, physical_device: vulkan.c.VkPhysicalDevice) !PicturaImage {
         const image = try vulkan.utils.create_image(device, w, h, queue_family_index, format);
@@ -451,7 +451,7 @@ pub fn draw_background(dst: *PicturaImage, r: f32, g: f32, b: f32, a: f32, app: 
     vulkan.c.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
 }
 
-pub fn load_pixels(pimage: *PicturaImage, app: *root.PicturaApp) ![*]u32 {
+pub fn load_pixels(pimage: *PicturaImage, app: *root.PicturaApp) ![]u32 {
     const command_buffer = try app.well.record(app.device);
 
     var barrier = vulkan.utils.get_image_memory_barrier(pimage, .load_pixels, app.queue_family_index);
@@ -496,7 +496,8 @@ pub fn load_pixels(pimage: *PicturaImage, app: *root.PicturaApp) ![*]u32 {
             return error.Vk_failed_to_map_memory;
         }
 
-        pimage.pixels = @ptrCast(@alignCast(data_ptr));
+        const px: [*]u32 = @ptrCast(@alignCast(data_ptr));
+        pimage.pixels = px[0 .. pimage.w * pimage.h];
     }
 
     return pimage.pixels.?;

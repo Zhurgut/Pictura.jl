@@ -5,7 +5,7 @@ using PicturaShapes
 
 
 @pictura begin
-    setup(size(600, 400))
+    setup(600, 400)
     nostroke()
     background(0)
 
@@ -18,8 +18,10 @@ using PicturaShapes
 end
 
 @pictura begin
-    setup(size(600, 400))
-    framerate(50)
+    setup(600, 400)
+    # framerate(360)
+    MIN_RPM = 40.0
+    RPM = MIN_RPM
 
     background(255)
     strokecolor(0)
@@ -28,7 +30,6 @@ end
     bg_color = color(255, 255, 255, 0.02)
     alpha = 0.3
     ϕ = 0.0
-    speed = 0.04
     darkmode = false
 
     @mousepressed begin
@@ -45,10 +46,10 @@ end
                 darkmode=true
             end
         elseif BUTTON == LEFT
-            speed += 1.0
+            RPM += 20
         end
     end
-    
+
     @drawloop begin
         background(bg_color)
         translate(width()/2, height()/2)
@@ -67,8 +68,9 @@ end
         fillcolor(202, 60, 50, alpha)
         circle(-0.5D, sqrt(3/4)*D-H, radius)
 
-        speed = max(speed * 0.98, 0.04)
-        ϕ += speed
+        RPM = max(RPM * exp(log(0.5) / (2framerate())), MIN_RPM) # multiply rpm by 0.5 every 2s
+        angle_per_s = RPM / 60 * 2π
+        ϕ += frametime() * angle_per_s
     end
 end
 
@@ -77,26 +79,26 @@ end
 function percolation(p)
     @pictura begin
 
-    setup(size(800, 600))
-    img = Pictura.create_image(width() ÷ 2, height() ÷ 2)
-    for r=1:height(img), c=1:width(img)
-        pixels(img)[r, c] = rand() > p ? color(1.0) : color(0.0)
-    end
-    updatepixels(img)
-    @drawloop begin
-        image(img, nearest_sampling=true)
-    end
+        setup(800, 600)
+        img = Image(width() ÷ 2, height() ÷ 2)
+        for r=1:height(img), c=1:width(img)
+            pixels(img)[r, c] = rand() > p ? color(1.0) : color(0.0)
+        end
+        updatepixels(img)
+        @drawloop begin
+            image(img, nearest_sampling=true)
+        end
 
     end
 end
 
 @pictura begin
-    setup(size(800, 600))
+    setup(800, 600)
     framerate(50)
-    
+
     strokewidth(8)
     bg_color = color(0.01, 0.0, 0.1, 0.06)
-    
+
     prev = mouse().pos
 
     @drawloop begin
@@ -109,14 +111,14 @@ end
 
 
 @pictura begin
-    setup(size(800, 600))
+    setup(800, 600)
 
     # check out https://urlich.art/
     raw = Pictura.load_image("test/test-urlich.jpg")
-    img = Pictura.create_image(width(), height())
+    img = Image(width(), height())
     image(img, raw)
-    img2 = Pictura.create_image(width(img), height(img))
-    img3 = Pictura.create_image(width(img), height(img))
+    img2 = Image(width(img), height(img))
+    img3 = Image(width(img), height(img))
 
     @keypressed begin
         if KEY == ENTER
@@ -135,7 +137,7 @@ end
             image(img)
         elseif m == 1
             Pictura.mix_channels(
-                Pictura.app.canvas, img, 
+                Pictura.app.canvas, img,
                 red_out_green_in=0.7f0, green_out_blue_in=1.3f0, blue_out_red_in=1.0f0
             )
         elseif m == 2
@@ -153,7 +155,7 @@ end
 
 
 @pictura begin
-    setup(size(800, 600))
+    setup(800, 600)
 
     framerate(60)
 
@@ -185,13 +187,13 @@ end
         translate(width()/2, height()/2)
         rotate(r)
         scale(s, 1)
-        
+
 
         strokecolor(38, 7, 79)
         fillcolor(69, 95, 181)
         strokewidth(4)
 
-        point(0,0)
+        point(0, 0)
         segment(-100, -100, 200, -50)
         rect(-200, -200, 100, 70, angle=0.2)
         ellipse(0, -200, 50, 35, angle=0.5)
@@ -251,18 +253,18 @@ end
 end
 
 @pictura begin
-    
+
     shapes = [
         ()->Point(mouse().x, mouse().y),
         ()->Segment(width()/2, height()/2, mouse().x, mouse().y),
-        ()->AxisRect(width()*0.5, height()*0.5, abs(mouse().x - width()*0.5),  abs(mouse().y - height()*0.5), mode=:radius),
+        ()->AxisRect(width()*0.5, height()*0.5, abs(mouse().x - width()*0.5), abs(mouse().y - height()*0.5), mode=:radius),
         ()->Rect(width()*0.5, height()*0.5, 100, 50, angle(mouse().pos - Point(width()*0.5, height()*0.5))),
         ()->Circle(mouse().pos, 100),
         ()->Ellipse(mouse().pos, Point(width()*0.5, height()*0.5), 0.5sdf(Point(width()*0.5, height()*0.5), mouse().pos)+10)
     ]
 
     setup(
-        size(500, 300)
+        500, 300
     )
 
     s = 1
@@ -277,7 +279,7 @@ end
         end
         updatepixels()
         B = rotate(bounding_box(S, 10), 0.0)
-        Pictura.draw_rect(Pictura.app.canvas, B, 0, color(0,0,0,0), color(255, 0,  0), 0.2)
+        Pictura.draw_rect(Pictura.app.canvas, B, 0, color(0, 0, 0, 0), color(255, 0, 0), 0.2)
     end
 end
 
@@ -319,7 +321,7 @@ begin
     end
 
     println(Pictura.Callbacks.on_mouse_pressed)
-    
+
     println("hey")
     println("hi0")
     @drawloop begin
@@ -334,12 +336,12 @@ function draw_noise(t, s)
     T = 1
     Threads.@threads for trd=1:T
         R = height() ÷ T
-        for r = (trd-1)*R+1:trd*R
+        for r = ((trd-1)*R+1):(trd*R)
             # println("$(Threads.threadid()): $r")
             for c = 1:width()
                 # pixels(Pictura.app.canvas)[r, c] = color(random_noise(r * 0.02 - t, c * 0.02, t))
 
-                # pixels(Pictura.app.canvas)[r, c] = color(perlin_noise(r * 0.04 - t, c * 0.04, t, cache_index=trd))
+                pixels(Pictura.app.canvas)[r, c] = color(perlin_noise(r * 0.04 - t, c * 0.04, t, cache_index=trd))
 
                 # if mouse().l
                 #     pixels(Pictura.app.canvas)[r, c] = color((0.25 .* perlin_noise(c * s, r * s, t, t, gradient=true)[1:2] .+ 0.5)..., 1.0)
@@ -355,8 +357,8 @@ function draw_noise(t, s)
                 # sn = sim_noise2d(c * 0.03, r * 0.03, t)
                 # pixels(Pictura.app.canvas)[r, c] = color(0.3sn[1]+0.5, 0.3sn[2]+0.5, 1.0)
 
-                sn = sim_noise3d(c * 0.03, r * 0.03, t)
-                pixels()[r, c] = color(0.5sn[1]+0.5, 0.5sn[2]+0.5, 0.5sn[3]+0.5)
+                # sn = sim_noise3d(c * 0.03, r * 0.03, t)
+                # pixels()[r, c] = color(0.5sn[1]+0.5, 0.5sn[2]+0.5, 0.5sn[3]+0.5)
 
                 # sn = curl_noise(r * 0.03, c * 0.03, 0.5, t)
                 # pixels()[r, c] = color(0.5sn[1]+0.5, 0.5sn[2]+0.5, 0.5sn[3]+0.5)
@@ -397,12 +399,12 @@ function draw_noise(t, s)
                 #     pixels(Pictura.app.canvas)[r, c] = color(map.(value_noise(r * 0.02, c * 0.02, t, gradient=true)[1:2], -1.5, 1.5, 0, 1)..., 1.0)
                 # elseif c < 2width() / 3 
                 #     pixels(Pictura.app.canvas)[r, c] = color(map.(perlin_noise(r * 0.02, c * 0.02, gradient=true)[1:2], -2, 2, 0, 1)..., 1.0)
-                    
+
                 # else
                 #     pixels(Pictura.app.canvas)[r, c] = color(map.(fractal(worley_noise2, r * 0.02, c * 0.02, t, t, gradient=true)[1:2], -1, 1, 0, 1)..., 1.0)
                 # end
 
-                
+
                 # wn = if c > width() / 2 
                 #     w2 = fractal(worley_noise2, r * 0.02, c * 0.02, t)
                 #     w1 = fractal(worley_noise1, r * 0.02, c * 0.02, t)
@@ -423,7 +425,7 @@ end
 
 @pictura begin
     setup(size(500, 300))
-    
+
 
     t = 0.0
 
@@ -434,12 +436,14 @@ end
 
         t += 0.01
 
-        if rand() < 0.1 println(framerate()) end
+        if rand() < 0.1
+            println(framerate())
+        end
     end
 end
 
 @pictura begin
-    w,h = 500, 300
+    w, h = 500, 300
     setup(size(w, h))
     framerate(40)
 
@@ -468,7 +472,7 @@ end
                     flow = Point(fractal(sim_noise2d, p2.x * s, p2.y * s))
                 end
 
-                
+
 
                 # k1 = 2 * Point(perlin_noise(p.x * s, p.y * s, 1), perlin_noise(p.x * s, p.y * s, 10, thread_idx=2)) + Point(-1, -1)
                 # p2 = points[i] + 0.5v * k1
@@ -505,7 +509,7 @@ end
 end
 
 @testset "gradients" begin
-    w,h = 600, 400
+    w, h = 600, 400
     setup(size(w, h))
     framerate(40)
 
@@ -516,7 +520,7 @@ end
     points = [scale(Point(rand(), rand()), w, h) for i=1:1000]
 
     @drawloop begin
-        
+
         t = framecount() * 0.01
         draw_noise(t, s)
 
@@ -541,7 +545,7 @@ end
 end
 
 @pictura begin
-    w,h = 600, 400
+    w, h = 600, 400
     setup(size(w, h))
     framerate(40)
 
@@ -610,7 +614,7 @@ function draw_arrow(p1, p2)
 end
 
 @pictura begin
-    w,h = 600, 400
+    w, h = 600, 400
     setup(size(w, h))
     framerate(20)
 
@@ -670,7 +674,7 @@ end
             size(600, 400)
         )
 
-        
+
     end
 end
 
@@ -684,7 +688,7 @@ end
 
     println(strokewidth())
 
-    x,y = 0.0,0.0
+    x, y = 0.0, 0.0
 
     @drawloop begin
         background(255)
@@ -723,7 +727,7 @@ end
             Line(200, 0, 0, 200),
             Segment(0, 400, 200, 600),
             AxisRect(450, 150, 100, 50, mode=:radius),
-            Rect(450, 450, 100, 50, angle, mode=:radius), 
+            Rect(450, 450, 100, 50, angle, mode=:radius),
             Circle(750, 150, 100),
             Ellipse(750, 450, 100, 50, angle)
         )
@@ -833,12 +837,12 @@ end
             nofill()
             strokecolor(255, 0, 0)
             rect(-205, -105, 410, 210)
-            image(img, src_rect=AxisRect(width(img)/2, height(img)/2, 800, 400), 
-                       dst_rect=Rect(-200, -100, 400, 200, 0),
-                       blendmode=:add,
-                       flip_horizontal=true,
-                       flip_vertical=true,
-                       color_mod=Color(0.9, 0.2, 0.5, 0.8))
+            image(img, src_rect=AxisRect(width(img)/2, height(img)/2, 800, 400),
+                dst_rect=Rect(-200, -100, 400, 200, 0),
+                blendmode=:add,
+                flip_horizontal=true,
+                flip_vertical=true,
+                color_mod=Color(0.9, 0.2, 0.5, 0.8))
         end
         if framecount() % 10 == 0
             println(framerate())
@@ -848,7 +852,7 @@ end
 end
 
 @testset "mouseclicked" begin
-    @setup  begin
+    @setup begin
         size(600, 400)
         background(255)
     end
@@ -892,7 +896,9 @@ end
 
     @drawloop begin
         println(framecount(), ", ", a, ", ", framerate())
-        if framecount() == 20 noloop() end
+        if framecount() == 20
+            noloop()
+        end
     end
 
     @test 1 == 1
@@ -910,7 +916,7 @@ end
     @drawloop begin
         if rand() < 4/rate
             Pictura.FrameRateManager.info()
-            
+
         end
         println(framecount(), ": ", framerate())
         if framecount() > 4rate
@@ -940,13 +946,17 @@ end
     sub_sample_interval = 2
     blurer = Pictura.blur_filter(sub_sample_interval)
     blur(img) = blur(Image(width(img), height(img)), img, blurer)
-    blur(dst, src, filter) = begin Pictura.apply_filter(dst, src, filter); loadpixels(dst); dst end
+    blur(dst, src, filter) = begin
+        Pictura.apply_filter(dst, src, filter);
+        loadpixels(dst);
+        dst
+    end
 
     img = Image("C:/Users/damia/.julia/dev/Pictura/test/test.jpg")
 
     naive_subsample = subsample(img, sub_sample_interval^4)
 
-    proper_subsample = subsample(blur(img             ), sub_sample_interval)
+    proper_subsample = subsample(blur(img), sub_sample_interval)
     proper_subsample = subsample(blur(proper_subsample), sub_sample_interval)
     proper_subsample = subsample(blur(proper_subsample), sub_sample_interval)
     proper_subsample = subsample(blur(proper_subsample), sub_sample_interval)
@@ -961,7 +971,7 @@ end
     Pictura.apply_filter(edges, proper_subsample, edge_detector)
     loadpixels(edges)
 
-    
+
     @drawloop begin
 
         if framecount()%60 < 30
@@ -1116,7 +1126,7 @@ end
         translate(width()/2, height()/2)
         scale(1, 4)
         rotate(framecount() / 50)
-        
+
         background(framecount() % 255)
         strokecolor(0)
         segment(0, 0, 30, 30)
@@ -1132,7 +1142,7 @@ end
     @drawloop begin
         rotate(0.2)
         translate(100, 40)
-        
+
         background(230, 230, 255)
         fillcolor(0.865, 0, 0)
         strokecolor(0)
@@ -1175,7 +1185,7 @@ end
                 translate(0, -lengs)
                 strokecolor(0)
                 d += 30
-                segment(0,0,0,lengs)
+                segment(0, 0, 0, lengs)
             elseif next == '+'
                 rotate(+0.35)
             elseif next == '-'
@@ -1188,7 +1198,7 @@ end
                 nostroke()
                 fillcolor(50, 200, 20, 100)
                 rect(-lengs/4, -lengs/4, lengs/2, lengs/2)
-            end 
+            end
         end
     end
     @setup begin
@@ -1210,7 +1220,7 @@ end
         iter += 1
         if iter == 6
             noloop()
-            
+
         end
     end
     sleep(3)
@@ -1292,7 +1302,7 @@ end
     end
 
     @drawloop begin
-        background(0,0,0,25)
+        background(0, 0, 0, 25)
         loadpixels()
         for i = 1:4000
             w::Int = floor(rand()*width()) + 1
@@ -1300,7 +1310,7 @@ end
             pixels()[h, w] = hsv(w/width(), h/height(), 1)
         end
         updatepixels()
-        
+
     end
 end
 
@@ -1453,7 +1463,9 @@ end
             background(255)
             fillcolor(2)
             text("Hello, World :) ∅, привет уважаемые госпожа", 0, 0)
-            if frameID() % 10 == 0 println(framerate()) end
+            if frameID() % 10 == 0
+                println(framerate())
+            end
         end
     catch e
         close_window()
