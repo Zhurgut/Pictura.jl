@@ -602,3 +602,22 @@ test "main test example" {
 
     try pictura_app.well.wait(pictura_app.device, pictura_app.queue);
 }
+
+test "transparent" {
+    try init.init_app(.{ .transparent = true });
+    defer init.quit();
+
+    const pixels = try image.load_pixels(&pictura_app.canvas, &pictura_app);
+    for (pixels, 0..) |_, i| {
+        pixels[i] = 0x5f0000ff;
+    }
+
+    try image.update_pixels(&pictura_app.canvas, &pictura_app);
+
+    while (pictura_app.running) {
+        pictura_app.wait_until_next_frame();
+        try pictura_app.event_handler.handle_events(&pictura_app);
+
+        try pictura_app.swapchain.present(&pictura_app);
+    }
+}

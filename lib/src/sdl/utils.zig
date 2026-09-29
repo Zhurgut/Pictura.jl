@@ -114,6 +114,20 @@ pub fn set_window_size(window: *sdl.c.SDL_Window, w: u32, h: u32) !void {
     }
 }
 
+// pub fn get_HWND(window: *sdl.c.SDL_Window) !std.os.windows.HWND {
+//     const props = root.sdl.c.SDL_GetWindowProperties(window);
+//     if (props == 0) {
+//         print_sdl_error();
+//         return error.SDL_GetWindowProperties_failed;
+//     }
+//     const hwnd = root.sdl.c.SDL_GetPointerProperty(props, "SDL_PROP_WINDOW_WIN32_HWND_POINTER", null);
+//     if (hwnd == null) {
+//         print_sdl_error();
+//         return error.SDL_GetWindowHWNDFailed;
+//     }
+//     return @ptrCast(hwnd.?);
+// }
+
 //      ___  _         _
 //     |   \(_)____ __| |__ _ _  _
 //     | |) | (_-< '_ \ / _` | || |

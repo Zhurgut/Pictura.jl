@@ -103,12 +103,12 @@ pub const PicturaImage = struct {
         };
     }
 
-    pub fn from_pixels(w: u32, h: u32, srcpixels: [*]u32, app: *root.PicturaApp) !PicturaImage {
+    pub fn from_pixels(w: u32, h: u32, srcpixels: []u32, app: *root.PicturaApp) !PicturaImage {
         var image = try PicturaImage.create(w, h, app.device, app.queue_family_index, app.physical_device);
         errdefer image.destroy(app.device, app.descriptor_pool);
 
-        var pixels = try load_pixels(&image, app);
-        @memcpy(pixels[0 .. w * h], srcpixels);
+        const pixels = try load_pixels(&image, app);
+        @memcpy(pixels, srcpixels);
 
         try update_pixels(&image, app);
 

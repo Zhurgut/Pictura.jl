@@ -96,7 +96,7 @@ pub export fn create_image_from_pixels(w: u32, h: u32, srcpixels: [*]u32) ?Image
     var image = root.image.PicturaImage.from_pixels(
         w,
         h,
-        srcpixels,
+        srcpixels[0 .. w * h],
         &root.pictura_app,
     ) catch {
         return null;

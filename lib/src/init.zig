@@ -9,11 +9,13 @@ const utils = root.utils;
 const image = root.image;
 const swapchain = root.swapchain;
 
-const PicturaOptions = struct {
+pub const PicturaOptions = struct {
     w: u32 = 800,
     h: u32 = 600,
     borderless: bool = false,
     fullscreen: bool = false,
+    transparent: bool = false,
+    // on windows, if window not transparent, set vulkan/openGL present method in nvidia control panel to "prefer native"
 
     instance_extensions: []const [*:0]const u8 = &.{},
     vulkan_layers: []const [*:0]const u8 = &.{},
@@ -34,7 +36,7 @@ pub fn init_app(options: PicturaOptions) !void {
     root.logger.info("sdl init", .{});
     errdefer sdl.c.SDL_Quit();
 
-    const window = try sdl.create_window(options.w, options.h);
+    const window = try sdl.create_window(options);
     root.logger.log_creation(window);
     errdefer sdl.c.SDL_DestroyWindow(window);
 
